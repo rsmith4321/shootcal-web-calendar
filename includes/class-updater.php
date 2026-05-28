@@ -41,6 +41,20 @@ class Updater {
 	private const ERROR_TTL    = HOUR_IN_SECONDS; // shorter cache when a fetch fails
 	private const USER_AGENT   = 'ShootCal-Availability-WP-Plugin';
 
+	/**
+	 * Plugin icon URLs served from the GitHub repo's .wordpress-org/ folder.
+	 *
+	 * The .wordpress-org/ folder is the convention used by the popular
+	 * 10up/action-wordpress-plugin-deploy GitHub Action, which will sync the
+	 * same files to WP.org SVN's `assets/` folder if/when we list there.
+	 * Using the same path on both sides keeps the icon URL stable.
+	 *
+	 * Served via raw.githubusercontent.com, which sends image/png with
+	 * cacheable headers - WP fetches each icon once and caches it.
+	 */
+	private const ICON_URL_1X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-availability/main/.wordpress-org/icon-128x128.png';
+	private const ICON_URL_2X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-availability/main/.wordpress-org/icon-256x256.png';
+
 	private string $plugin_basename;
 	private string $plugin_slug;
 	private string $current_version;
@@ -101,7 +115,11 @@ class Updater {
 			'package'      => $release['download_url'],
 			'tested'       => '6.8',
 			'requires_php' => '8.0',
-			'icons'        => array(),
+			'icons'        => array(
+				'1x'      => self::ICON_URL_1X,
+				'2x'      => self::ICON_URL_2X,
+				'default' => self::ICON_URL_2X,
+			),
 			'banners'      => array(),
 			'banners_rtl'  => array(),
 		);
@@ -150,6 +168,11 @@ class Updater {
 			'requires'          => '6.4',
 			'requires_php'      => '8.0',
 			'tested'            => '6.8',
+			'icons'             => array(
+				'1x'      => self::ICON_URL_1X,
+				'2x'      => self::ICON_URL_2X,
+				'default' => self::ICON_URL_2X,
+			),
 		);
 	}
 

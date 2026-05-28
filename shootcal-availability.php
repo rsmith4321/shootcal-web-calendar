@@ -3,7 +3,7 @@
  * Plugin Name:       ShootCal Availability
  * Plugin URI:        https://shootcal.app/wordpress
  * Description:       Display your Google Calendar availability on your website as a month grid. Reads a private iCal URL and shows busy days without revealing event details.
- * Version:           0.5.2
+ * Version:           0.5.3
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Ryan Smith
@@ -22,7 +22,7 @@ namespace ShootCalAvailability;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '0.5.2';
+const VERSION     = '0.5.3';
 const SLUG        = 'shootcal-availability';
 const OPTION_KEY  = 'shootcal_availability_options';
 const CACHE_KEY   = 'shootcal_availability_ical';

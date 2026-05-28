@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.5.2
+Stable tag: 0.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -88,6 +88,9 @@ The iCal feed is cached for 10 minutes. You can force an immediate refresh from 
 Example: `[shootcal_availability months="2" show_times="1"]`
 
 == Changelog ==
+
+= 0.5.3 =
+* Plugin icon: the ShootCal app's shutter + calendar + sunset-gradient icon now shows next to the plugin in WP admin's Plugins list and update modal, matching the desktop app's identity. Icons are served from the GitHub repo so existing installs pick them up on the next update check (no new download needed beyond this one).
 
 = 0.5.2 =
 * Added GitHub Releases auto-updater. While the plugin is installed from GitHub (not yet on the WordPress.org directory), newer releases now show up in wp-admin > Plugins with the standard "Update available" banner and one-click upgrade flow. Same UX as a directory-listed plugin. Checks GitHub once every 12 hours; gracefully degrades when offline.
