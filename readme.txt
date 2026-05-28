@@ -2,9 +2,9 @@
 Contributors: rsmith4321
 Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
-Tested up to: 6.7
+Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.5.0
+Stable tag: 0.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -88,6 +88,17 @@ The iCal feed is cached for 10 minutes. You can force an immediate refresh from 
 Example: `[shootcal_availability months="2" show_times="1"]`
 
 == Changelog ==
+
+= 0.5.2 =
+* Added GitHub Releases auto-updater. While the plugin is installed from GitHub (not yet on the WordPress.org directory), newer releases now show up in wp-admin > Plugins with the standard "Update available" banner and one-click upgrade flow. Same UX as a directory-listed plugin. Checks GitHub once every 12 hours; gracefully degrades when offline.
+* Bumped "Tested up to" to WordPress 6.8.
+
+= 0.5.1 =
+* Booking-times popover (tap a Limited cell) now grows wider than the cell so windows like "Booked 7:30 pm - 8:30 pm" stay on a single line. Centered under the cell, with edge-detection that nudges horizontally so popovers on the leftmost/rightmost columns never spill past the calendar card.
+* Popover styled as a standalone floating rounded card with a small gap from the cell, instead of trying to "join" the cell with matching radii (which broke alignment once the popover could be wider than the cell).
+* Toolbar typography: month name now uses a heavier weight (800) and slightly tighter tracking; year is rendered ~82% size in the sunset accent color, matching the desktop app.
+* Settings: added color pickers for the Limited and Booked cell tints. Cells render at 80% opacity at rest and lift to the picked color at full opacity on hover or when the popover is open, so the hover state is always the "full strength" version of the chosen color.
+* Calendar grid now always renders a full 6-week month view (matching the macOS app), and surfaces events on off-month days. Only the date number is muted to signal which month they actually belong to.
 
 = 0.5.0 =
 * Added a native Gutenberg block: search "ShootCal Availability" in the block inserter (under Widgets). The block server-renders the same calendar as the `[shootcal_availability]` shortcode, so output is identical and there is no duplicate caching logic. Live preview in the editor uses WP core's ServerSideRender component.
