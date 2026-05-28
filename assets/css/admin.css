@@ -1,0 +1,20 @@
+/* ShootCal Availability - admin settings page */
+
+.shootcal-availability__settings .form-table th { width: 220px; }
+
+.shootcal-availability__test-result {
+	display: inline-block;
+	margin-left: 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+.shootcal-availability__test-result.is-success { color: #1e7e1e; }
+.shootcal-availability__test-result.is-error   { color: #a40000; }
+
+.shootcal-availability__settings fieldset label {
+	display: inline-block;
+	margin-bottom: 4px;
+}
+.shootcal-availability__settings fieldset label + label {
+	display: block;
+}

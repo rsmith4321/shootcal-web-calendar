@@ -1,0 +1,606 @@
+/* ShootCal Availability - frontend month grid + paginated toolbar.
+ *
+ * ============================================================================
+ *  Theming / override paths for site owners (read me first if you're a theme dev):
+ * ============================================================================
+ *
+ *  1. CSS CUSTOM PROPERTIES (recommended)
+ *     The whole calendar is themed via the variables below. Override them
+ *     anywhere outside the plugin layer to recolor without touching selectors:
+ *
+ *        .shootcal-availability__wrap {
+ *            --shootcal-booked-bg: #ffe4e6;
+ *            --shootcal-wrap-radius: 4px;
+ *            --shootcal-label-fg: #333;
+ *        }
+ *
+ *     Available variables (defaults shown):
+ *        --shootcal-wrap-bg          card background
+ *        --shootcal-wrap-border      card border color
+ *        --shootcal-wrap-radius      card corner radius
+ *        --shootcal-wrap-shadow      card box-shadow
+ *        --shootcal-grid-line        between-cell hairline color
+ *        --shootcal-toolbar-border   toolbar bottom divider
+ *        --shootcal-label-fg         month label color
+ *        --shootcal-muted            weekday header + muted text
+ *        --shootcal-btn-bg/fg/border/hover-bg/focus    nav button look
+ *        --shootcal-available-bg/fg                    open day cell
+ *        --shootcal-limited-bg/fg                      timed-only day cell
+ *        --shootcal-booked-bg/fg                       all-day-blocked day cell
+ *        --shootcal-past-bg/fg                         past day wash
+ *        --shootcal-today-ring                         today's date highlight
+ *        --shootcal-credit-fg                          attribution color
+ *
+ *  2. SELECTOR OVERRIDES
+ *     All plugin styles are wrapped in @layer shootcal-availability. Any
+ *     unlayered CSS in the theme will WIN over these without any !important
+ *     gymnastics. Just write a normal rule in your theme stylesheet and it
+ *     takes precedence.
+ *
+ *  3. JS OVERRIDES
+ *     Not needed - the plugin is a server-rendered structure with vanilla CSS.
+ *     No build step, no shadow DOM, no JS-injected styles.
+ * ============================================================================
+ */
+
+/* Variables live OUTSIDE the layer so they're easy to override globally without
+ * having to think about layer cascade. */
+.shootcal-availability__wrap {
+	--shootcal-wrap-bg: #ffffff;
+	--shootcal-wrap-border: #e5e7eb;
+	--shootcal-wrap-radius: 10px;
+	--shootcal-wrap-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+	--shootcal-grid-line: #e5e7eb;
+	--shootcal-toolbar-border: #e5e7eb;
+
+	--shootcal-label-fg: #111827;
+	--shootcal-muted: #9ca3af;
+
+	--shootcal-btn-bg: transparent;
+	--shootcal-btn-fg: #374151;
+	--shootcal-btn-border: #d1d5db;
+	--shootcal-btn-hover-bg: #f3f4f6;
+	--shootcal-btn-focus: #2271b1;
+	--shootcal-btn-active-bg: #e5e7eb;
+
+	/* === ShootCal brand colors ============================================
+	 * Sourced directly from the macOS app's color assets so the web grid
+	 * stays in family with the desktop experience.
+	 *
+	 *   sunset        primary identity orange  (rgb 0.78, 0.42, 0.18)
+	 *   sunset-vivid  brighter accent          (rgb 0.95, 0.45, 0.20)
+	 *   sunrise       softer amber             (rgb 0.85, 0.62, 0.30)
+	 *
+	 * Stored TWO ways for maximum flexibility:
+	 *   --shootcal-{name}-rgb   raw "R, G, B" triplet for use with rgba()
+	 *                           when you want a transparent tint
+	 *                              background: rgba(var(--shootcal-sunset-rgb), 0.1)
+	 *   --shootcal-{name}       solid-color alias, drop-in for `color:`,
+	 *                           `background:`, `border-color:`, etc.
+	 *
+	 * Limited cells derive their tint from sunrise; Booked cells from sunset;
+	 * the whole grid stays visually anchored to the brand palette.
+	 */
+	--shootcal-sunset-rgb:        199, 107,  46;
+	--shootcal-sunset-vivid-rgb:  242, 115,  51;
+	--shootcal-sunrise-rgb:       217, 158,  76;
+	--shootcal-sunset:       rgb( var(--shootcal-sunset-rgb) );
+	--shootcal-sunset-vivid: rgb( var(--shootcal-sunset-vivid-rgb) );
+	--shootcal-sunrise:      rgb( var(--shootcal-sunrise-rgb) );
+
+	--shootcal-available-bg: #ffffff;
+	--shootcal-available-fg: #1f2937;
+
+	/* Limited + Booked cell colors are stored as RGB triplets so they can be
+	 * rendered at 0.8 opacity at rest and 1.0 on hover via rgba(). The plugin's
+	 * Settings page exposes color pickers that emit overrides for these via an
+	 * inline <style> when the user picks non-default colors. */
+	--shootcal-limited-bg-rgb: 253, 242, 221; /* #fdf2dd default */
+	--shootcal-limited-fg: #7a4f1a;
+	--shootcal-booked-bg-rgb:  250, 224, 207; /* #fae0cf default */
+	--shootcal-booked-fg: #7c3d18;
+
+	--shootcal-past-bg: #f9fafb;
+	--shootcal-past-fg: #b6bac0;
+	--shootcal-out-bg: #fafbfc;
+	--shootcal-credit-fg: #9ca3af;
+}
+
+@layer shootcal-availability {
+
+	/* === Defense against inadvertent wrapping ===
+	 *
+	 * If a user pastes the shortcode into a paragraph block AND toggles
+	 * inline-code formatting (Cmd+E in Gutenberg), the resulting markup is
+	 * `<p><code>[shortcode]</code></p>` and WordPress runs the shortcode but
+	 * leaves the `<code>` wrapping. That `<code>` then becomes the grid item
+	 * inside our cell and collapses the entire layout.
+	 *
+	 * Same problem can happen with `<pre>`, `<kbd>`, `<samp>`, or with WP's
+	 * `wpautop` filter wrapping fragments in `<p>` tags. Defang all of them by
+	 * making them `display: contents` (their children become direct children
+	 * of the grid container) and stripping the code-like font + background.
+	 *
+	 * The user-visible fix is to use the "ShootCal Availability" block instead
+	 * of a shortcode in a code-formatted paragraph, but defending in CSS means
+	 * the calendar still renders correctly even when the editor mistake happens.
+	 */
+	.shootcal-availability__wrap code,
+	.shootcal-availability__wrap pre,
+	.shootcal-availability__wrap kbd,
+	.shootcal-availability__wrap samp,
+	.shootcal-availability__day code,
+	.shootcal-availability__day pre {
+		display: contents !important;
+		font-family: inherit !important;
+		background: transparent !important;
+		color: inherit !important;
+		padding: 0 !important;
+		border: 0 !important;
+		white-space: normal !important;
+	}
+
+	/* --- Card wrap --- */
+
+	.shootcal-availability__wrap {
+		display: flex;
+		flex-direction: column;
+		margin: 1.5rem 0;
+		background: var(--shootcal-wrap-bg);
+		border: 1px solid var(--shootcal-wrap-border);
+		border-radius: var(--shootcal-wrap-radius);
+		box-shadow: var(--shootcal-wrap-shadow);
+		overflow: hidden;
+	}
+
+	/* --- Toolbar (Month Year | < Today >) --- */
+
+	.shootcal-availability__toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.85rem 1rem;
+		border-bottom: 1px solid var(--shootcal-toolbar-border);
+		background: var(--shootcal-wrap-bg);
+	}
+
+	.shootcal-availability__nav-label {
+		margin: 0;
+		font-size: 1.4rem;
+		font-weight: 800; /* heavier weight on the month name */
+		color: var(--shootcal-label-fg);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+	}
+
+	/* Year accent in the toolbar label - matches the desktop app: signature
+	 * sunset color, slightly smaller + lighter weight than the month name so
+	 * the eye reads month first, year as supporting context. */
+	.shootcal-availability__nav-year {
+		color: var(--shootcal-sunset);
+		font-size: 0.82em;     /* ~82% of parent = ~1.15rem when label is 1.4rem */
+		font-weight: 600;      /* lighter than the 800 month name */
+		letter-spacing: -0.01em;
+		margin-left: 0.1em;
+	}
+
+	/* Three discrete buttons grouped by a small gap. No shared pill container,
+	 * no negative-offset outline tricks - keeps focus rings + active states
+	 * from intersecting with sibling borders. */
+	.shootcal-availability__nav {
+		display: inline-flex;
+		align-items: stretch;
+		gap: 0.3rem;
+		flex-shrink: 0;
+	}
+
+	.shootcal-availability__btn {
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 500;
+		background: #ffffff;
+		color: var(--shootcal-btn-fg);
+		border: 1px solid var(--shootcal-btn-border);
+		border-radius: 6px;
+		padding: 0.4rem 0.9rem;
+		cursor: pointer;
+		line-height: 1;
+		transition: background 0.1s ease, color 0.1s ease;
+		appearance: none;
+		-webkit-appearance: none;
+		box-shadow: none;
+	}
+	.shootcal-availability__btn:hover:not(:disabled) {
+		background: var(--shootcal-btn-hover-bg);
+		color: var(--shootcal-label-fg);
+	}
+	.shootcal-availability__btn:active:not(:disabled) {
+		background: var(--shootcal-btn-active-bg);
+		color: var(--shootcal-label-fg);
+	}
+	.shootcal-availability__btn:focus-visible {
+		outline: 2px solid var(--shootcal-btn-focus);
+		outline-offset: 2px;
+	}
+	.shootcal-availability__btn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.shootcal-availability__btn--prev,
+	.shootcal-availability__btn--next {
+		font-size: 1.1rem;
+		padding: 0.35rem 0.7rem;
+		min-width: 2rem;
+		color: var(--shootcal-label-fg);
+	}
+
+	/* Today button gets a brand-tinted hover/active state - subtle sunset wash
+	 * so the user feels the connection between the button and "today" highlight
+	 * in the grid. Uses rgba over the existing white bg. */
+	.shootcal-availability__btn--today:hover:not(:disabled) {
+		background: rgba( var(--shootcal-sunset-rgb), 0.08 );
+		border-color: rgba( var(--shootcal-sunset-rgb), 0.4 );
+		color: var(--shootcal-sunset);
+	}
+	.shootcal-availability__btn--today:active:not(:disabled) {
+		background: rgba( var(--shootcal-sunset-rgb), 0.16 );
+		border-color: rgba( var(--shootcal-sunset-rgb), 0.55 );
+	}
+
+	/* --- Viewport / month grid --- */
+
+	.shootcal-availability__viewport { position: relative; }
+	.shootcal-availability__month-panel { display: block; }
+	.shootcal-availability__month-panel[hidden] { display: none; }
+
+	.shootcal-availability__wrap--paginated .shootcal-availability__caption {
+		display: none;
+	}
+
+	.shootcal-availability--month {
+		display: grid;
+		grid-template-columns: 1fr;
+	}
+
+	.shootcal-availability__caption {
+		font-size: 1.15rem;
+		font-weight: 600;
+		color: var(--shootcal-label-fg);
+		padding: 0.75rem 1rem;
+		margin: 0;
+		border-bottom: 1px solid var(--shootcal-grid-line);
+	}
+
+	/* Weekday header row */
+	.shootcal-availability__week--header {
+		display: grid;
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+		background: var(--shootcal-out-bg);
+		border-bottom: 1px solid var(--shootcal-grid-line);
+	}
+	.shootcal-availability__weekday {
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		font-weight: 600;
+		color: var(--shootcal-muted);
+		text-align: center;
+		padding: 0.45rem 0;
+	}
+	.shootcal-availability__weekday abbr {
+		text-decoration: none;
+		border: none;
+	}
+
+	/* Day rows */
+	.shootcal-availability__week {
+		display: grid;
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+	}
+	.shootcal-availability__week + .shootcal-availability__week {
+		border-top: 1px solid var(--shootcal-grid-line);
+	}
+
+	/* --- Day cell (flat, no rounded pills, joined by 1px lines) ---
+	 *
+	 * Uses CSS Grid with three rows: date (auto) / status (auto) / a 1fr filler
+	 * row that holds the bookings list. The bookings element is align-self:end
+	 * inside that 1fr row, which RELIABLY pins it to the bottom of the cell
+	 * regardless of whether sibling cells in the row force the cell to grow.
+	 * This is more deterministic than the flex auto-margin trick (which can
+	 * lose to theme CSS that flips the cell to display:block). */
+	.shootcal-availability__day {
+		display: grid !important;
+		grid-template-rows: auto auto 1fr !important;
+		row-gap: 0;
+		min-height: 5.5rem;
+		min-width: 0;
+		padding: 0.4rem 0.55rem 0.5rem;
+		background: var(--shootcal-available-bg);
+		color: var(--shootcal-available-fg);
+		border-left: 1px solid var(--shootcal-grid-line);
+		box-sizing: border-box;
+		position: relative !important;
+	}
+	.shootcal-availability__day:first-child { border-left: none; }
+
+	/* Three busy states - the user picks the "peak" color via Settings; the cell
+	 * renders at 0.8 opacity at rest and rises to 1.0 (full) on hover or when
+	 * a popover is open. Computed via rgba() against the RGB triplet variables
+	 * so override is a single style override. */
+	.shootcal-availability__day.is-booked {
+		background: rgba( var(--shootcal-booked-bg-rgb), 0.8 );
+		color: var(--shootcal-booked-fg);
+		transition: background-color 0.12s ease;
+	}
+	.shootcal-availability__day.is-limited {
+		background: rgba( var(--shootcal-limited-bg-rgb), 0.8 );
+		color: var(--shootcal-limited-fg);
+		transition: background-color 0.12s ease;
+	}
+	/* On hover and when opened, the cells lift to 100% of their picked color. */
+	.shootcal-availability__day.is-booked:hover {
+		background: rgba( var(--shootcal-booked-bg-rgb), 1 );
+	}
+	.shootcal-availability__day.is-limited:hover,
+	.shootcal-availability__day.is-limited.is-open,
+	.shootcal-availability__day.is-limited.is-open-above {
+		background: rgba( var(--shootcal-limited-bg-rgb), 1 );
+	}
+
+	/* Out-of-month cells render their events with the same state coloring as
+	 * in-month cells (matches the macOS app's month view). The only visual
+	 * cue that a cell belongs to a different month is the muted date number. */
+	.shootcal-availability__day.is-out-of-month .shootcal-availability__date {
+		color: var(--shootcal-muted);
+		font-weight: 500;
+	}
+	.shootcal-availability__day.is-past {
+		background: var(--shootcal-past-bg);
+		color: var(--shootcal-past-fg);
+	}
+	.shootcal-availability__day.is-past .shootcal-availability__date {
+		font-weight: 500;
+	}
+
+	/* Today: just color the date number in the brighter sunset-vivid so it
+	 * pops at small sizes. No background bubble (was distorting cell layout). */
+	.shootcal-availability__day.is-today .shootcal-availability__date {
+		color: var(--shootcal-sunset-vivid);
+		font-weight: 700;
+	}
+
+	/* Date number - explicit BLOCK so date + status always stack regardless of
+	 * any inherited inline rules from the theme. Mandatory bottom margin
+	 * gives the chip room to breathe. */
+	.shootcal-availability__date {
+		display: block;
+		font-weight: 600;
+		font-size: 0.95rem;
+		line-height: 1.2;
+		margin: 0 0 0.3rem; /* the "bit of padding below the date number" */
+	}
+
+	/* Status chip - small uppercase label below the date */
+	.shootcal-availability__status {
+		display: block;
+		font-size: 0.6rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-weight: 700;
+		opacity: 0.7;
+		line-height: 1;
+	}
+
+	/* Don't shout "Available" on every open day - emptiness is the cue. */
+	.shootcal-availability__day.is-available .shootcal-availability__status {
+		display: none;
+	}
+
+	/* Bookings list sits in the cell's 1fr grid row and aligns to its end -
+	 * this is the deterministic "pin to bottom" mechanism. The `padding-top`
+	 * gives the list a touch of breathing room visually inside its track.
+	 * The `li` rules explicitly reset font-family / background / list-style
+	 * so theme CSS that targets generic `ul`/`li` in post content can't make
+	 * the booked times look like a code block or get a default bullet. */
+	.shootcal-availability__bookings {
+		grid-row: 3 !important;
+		align-self: end !important;
+		list-style: none !important;
+		list-style-type: none !important;
+		margin: 0;
+		padding: 0.3rem 0 0;
+		font-size: 0.7rem;
+		line-height: 1.4;
+		font-weight: 500;
+		font-family: inherit;
+		background: transparent;
+	}
+	.shootcal-availability__bookings li {
+		margin: 0 0 3px;
+		padding: 0;
+		background: transparent;
+		color: inherit;
+		font-family: inherit;
+		opacity: 0.85;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		list-style: none;
+	}
+	.shootcal-availability__bookings li:last-child { margin-bottom: 0; }
+	.shootcal-availability__bookings li::before {
+		content: none !important; /* defeat any theme rule that injects bullet glyphs */
+	}
+
+	/* --- Click-to-expand popover (all viewports) ---
+	 *
+	 * When a Limited cell is tapped, the cell visually "lifts" - rounded
+	 * corners on top, a slight shadow above - and the bookings list pops
+	 * out below as a matching rounded tail with the same background color.
+	 * Together they look like one tall rounded card holding the day's
+	 * full booking detail. The cell stays in its grid position so the rest
+	 * of the layout doesn't shift; only the bookings overlap downward.
+	 */
+
+	/* Tappable affordance on cells with bookings. Hover/active states are
+	 * handled by the 0.8 -> 1.0 alpha shift above; cursor change is all the
+	 * extra hint that's needed. */
+	.shootcal-availability__day.is-limited {
+		cursor: pointer;
+	}
+
+	/* Let the popover tail extend past the card's rounded clip. */
+	.shootcal-availability__wrap { overflow: visible; }
+
+	/* Cell in open state: lifted via z-index. No border-radius trick anymore -
+	 * the popover is now a standalone floating card (wider than the cell, can
+	 * be horizontally nudged at the calendar edges) so trying to "join" it to
+	 * the cell with matching radii doesn't align. The popover's own shadow +
+	 * the cell's color shift carry the visual association. */
+	.shootcal-availability__day.is-open {
+		z-index: 25 !important;
+	}
+
+	/* Bookings becomes the "tail" - extends BELOW the cell.
+	 * Explicit background-color per cell state so the popover is fully opaque
+	 * and visually covers the row below it (no see-through onto neighbors).
+	 * !important on the structural pieces so theme CSS can't break positioning.
+	 *
+	 * Sizing: the popover is allowed to grow WIDER than its cell so booking
+	 * times like "Booked 7:30 pm - 8:30 pm" stay on a single line. It's centered
+	 * under the cell; JS measures after opening and nudges the transform
+	 * horizontally if it would overflow the calendar card's edges. min-width:
+	 * 100% guarantees it never gets narrower than the cell on wide layouts. */
+	.shootcal-availability__day.is-open .shootcal-availability__bookings {
+		display: block !important;
+		position: absolute !important;
+		top: calc(100% + 4px) !important;  /* small gap so it reads as a floating card */
+		bottom: auto !important;
+		left: 50% !important;
+		right: auto !important;
+		transform: translateX(-50%);
+		min-width: 100%;
+		width: max-content;
+		max-width: 16rem;
+		margin: 0;
+		padding: 0.55rem 0.8rem 0.75rem;
+		background-color: rgba( var(--shootcal-limited-bg-rgb), 1 );
+		color: var(--shootcal-limited-fg);
+		border-radius: 10px;
+		box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.28),
+		            0 0 0 1px var(--shootcal-grid-line);
+		font-size: 0.78rem;
+		font-weight: 500;
+		line-height: 1.4;
+		z-index: 25 !important;
+	}
+	/* Booked state - keep the popover in the cell's color family even though
+	 * Booked cells aren't currently interactive. Future-proof. */
+	.shootcal-availability__day.is-booked.is-open .shootcal-availability__bookings {
+		background-color: rgba( var(--shootcal-booked-bg-rgb), 1 );
+		color: var(--shootcal-booked-fg);
+	}
+
+	/* Flip the popover ABOVE the cell when JS detects last-row position.
+	 * Same standalone-card chrome, just inverted vertical direction. */
+	.shootcal-availability__day.is-open-above .shootcal-availability__bookings {
+		top: auto !important;
+		bottom: calc(100% + 4px) !important;
+		border-radius: 10px;
+		box-shadow: 0 -12px 24px -6px rgba(0, 0, 0, 0.28),
+		            0 0 0 1px var(--shootcal-grid-line);
+	}
+
+	/* Each booking line breaks naturally - no truncation when popped open. */
+	.shootcal-availability__day.is-open .shootcal-availability__bookings li {
+		white-space: normal;
+		overflow: visible;
+		text-overflow: clip;
+		opacity: 1;
+		margin: 0 0 0.3rem;
+	}
+	.shootcal-availability__day.is-open .shootcal-availability__bookings li:last-child {
+		margin-bottom: 0;
+	}
+
+	/* --- Mobile sizing --- */
+	@media (max-width: 600px) {
+		.shootcal-availability__toolbar {
+			padding: 0.65rem;
+		}
+		.shootcal-availability__nav-label {
+			font-size: 1.1rem;
+		}
+		.shootcal-availability__day {
+			min-height: 3.5rem;
+			padding: 0.3rem;
+		}
+		.shootcal-availability__date { font-size: 0.85rem; margin-bottom: 0.2rem; }
+		.shootcal-availability__weekday { font-size: 0.6rem; padding: 0.3rem 0; }
+		.shootcal-availability__status { font-size: 0.55rem; }
+		.shootcal-availability__btn { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+		.shootcal-availability__btn--prev,
+		.shootcal-availability__btn--next { padding: 0.3rem 0.55rem; font-size: 1rem; }
+
+		/* On phones the inline bookings list would just be a single ellipsed
+		 * line - hide it. Users tap to see the full popover instead. */
+		.shootcal-availability__bookings { display: none; }
+
+		/* Tighter popover padding on phones. */
+		.shootcal-availability__day.is-open .shootcal-availability__bookings {
+			font-size: 0.72rem;
+			padding: 0.5rem 0.6rem 0.6rem;
+		}
+	}
+
+	/* --- No-JS fallback --- */
+	.no-js .shootcal-availability__month-panel,
+	.no-js .shootcal-availability__month-panel[hidden] {
+		display: block !important;
+	}
+	.no-js .shootcal-availability__toolbar { display: none; }
+	.no-js .shootcal-availability__wrap--paginated .shootcal-availability__caption {
+		display: block;
+	}
+
+	/* --- Attribution --- */
+	.shootcal-availability__credit {
+		margin: 0;
+		padding: 0.5rem 1rem 0.55rem;
+		font-size: 0.7rem;
+		line-height: 1.4;
+		color: var(--shootcal-credit-fg);
+		text-align: right;
+		border-top: 1px solid var(--shootcal-grid-line);
+		background: var(--shootcal-out-bg);
+	}
+	.shootcal-availability__credit a {
+		color: inherit;
+		text-decoration: underline;
+		text-decoration-style: dotted;
+		text-underline-offset: 2px;
+	}
+	.shootcal-availability__credit a:hover,
+	.shootcal-availability__credit a:focus-visible {
+		color: var(--shootcal-sunset);
+	}
+
+	/* Screen-reader only */
+	.shootcal-availability__sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0,0,0,0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+} /* end @layer shootcal-availability */

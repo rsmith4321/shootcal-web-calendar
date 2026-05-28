@@ -1,0 +1,233 @@
+/* ShootCal Availability - paginated calendar navigation (Today / < / > / Month Year).
+ *
+ * Vanilla JS, no dependencies. All month panels are rendered server-side; this
+ * script only changes which one is visible based on user input. With JS off,
+ * the server-rendered "active" panel stays visible and the toolbar buttons
+ * just do nothing (degraded but readable). The no-JS CSS fallback also
+ * surfaces all panels at once for screen readers etc. when JS fails to run.
+ */
+( function () {
+	'use strict';
+
+	function activate( wrap, idx ) {
+		var total = parseInt( wrap.dataset.shootcalTotal, 10 ) || 0;
+		if ( idx < 0 ) idx = 0;
+		if ( idx >= total ) idx = total - 1;
+		wrap.dataset.shootcalActive = String( idx );
+
+		// Show only the matching panel.
+		var panels = wrap.querySelectorAll( '.shootcal-availability__month-panel' );
+		var monthName = '';
+		var monthYear = '';
+		var labelTextFallback = '';
+		panels.forEach( function ( p ) {
+			var match = parseInt( p.dataset.shootcalMonthIdx, 10 ) === idx;
+			p.classList.toggle( 'is-active', match );
+			if ( match ) {
+				p.removeAttribute( 'hidden' );
+				monthName = p.dataset.shootcalMonthName || '';
+				monthYear = p.dataset.shootcalMonthYear || '';
+				labelTextFallback = p.dataset.shootcalMonthLabel || '';
+			} else {
+				p.setAttribute( 'hidden', '' );
+			}
+		} );
+
+		// Update the visible month label in the toolbar - keep the year styled
+		// in the signature sunset accent via the dedicated span.
+		var label = wrap.querySelector( '[data-shootcal-month-label]' );
+		if ( label ) {
+			if ( monthName && monthYear ) {
+				// Rebuild label HTML. Both pieces are escaped server-side; here
+				// they came through the DOM dataset which doesn't include markup.
+				label.textContent = ''; // clear
+				label.appendChild( document.createTextNode( monthName + ' ' ) );
+				var yearSpan = document.createElement( 'span' );
+				yearSpan.className = 'shootcal-availability__nav-year';
+				yearSpan.textContent = monthYear;
+				label.appendChild( yearSpan );
+			} else if ( labelTextFallback ) {
+				label.textContent = labelTextFallback;
+			}
+		}
+
+		// Enable/disable nav buttons at the boundaries + Today.
+		var prev = wrap.querySelector( '.shootcal-availability__btn--prev' );
+		var next = wrap.querySelector( '.shootcal-availability__btn--next' );
+		var todayBtn = wrap.querySelector( '.shootcal-availability__btn--today' );
+		if ( prev ) prev.disabled = idx <= 0;
+		if ( next ) next.disabled = idx >= total - 1;
+		if ( todayBtn ) {
+			var todayIdx = parseInt( wrap.dataset.shootcalToday, 10 );
+			todayBtn.disabled = ( todayIdx === -1 ) || ( todayIdx === idx );
+		}
+
+		// Any popover the user had open belonged to the now-hidden panel.
+		// Close everything so it doesn't visually re-appear when they navigate
+		// back to that month. Also wipe inline edge-nudge transforms so the
+		// next open of that cell re-measures fresh.
+		wrap.querySelectorAll( '.shootcal-availability__day.is-open, .shootcal-availability__day.is-open-above' ).forEach( function ( c ) {
+			c.classList.remove( 'is-open' );
+			c.classList.remove( 'is-open-above' );
+			var pop = c.querySelector( '.shootcal-availability__bookings' );
+			if ( pop ) pop.style.transform = '';
+		} );
+	}
+
+	document.addEventListener( 'click', function ( e ) {
+		var btn = e.target.closest && e.target.closest( '[data-shootcal-action]' );
+		if ( ! btn ) return;
+		var wrap = btn.closest( '.shootcal-availability__wrap--paginated' );
+		if ( ! wrap ) return;
+
+		var current = parseInt( wrap.dataset.shootcalActive, 10 ) || 0;
+		var todayIdx = parseInt( wrap.dataset.shootcalToday, 10 );
+		var action = btn.dataset.shootcalAction;
+
+		if ( action === 'prev' ) {
+			activate( wrap, current - 1 );
+		} else if ( action === 'next' ) {
+			activate( wrap, current + 1 );
+		} else if ( action === 'today' && todayIdx >= 0 ) {
+			activate( wrap, todayIdx );
+		}
+	} );
+
+	// Keyboard nav when focus is anywhere inside the calendar wrap.
+	document.addEventListener( 'keydown', function ( e ) {
+		var wrap = e.target.closest && e.target.closest( '.shootcal-availability__wrap--paginated' );
+		if ( ! wrap ) return;
+		// Don't hijack typing in form controls (currently none in our markup, but be polite).
+		if ( e.target.matches( 'input, textarea, select' ) ) return;
+
+		var current = parseInt( wrap.dataset.shootcalActive, 10 ) || 0;
+		var todayIdx = parseInt( wrap.dataset.shootcalToday, 10 );
+
+		if ( e.key === 'ArrowLeft' ) {
+			e.preventDefault();
+			activate( wrap, current - 1 );
+		} else if ( e.key === 'ArrowRight' ) {
+			e.preventDefault();
+			activate( wrap, current + 1 );
+		} else if ( ( e.key === 't' || e.key === 'T' ) && todayIdx >= 0 ) {
+			e.preventDefault();
+			activate( wrap, todayIdx );
+		}
+	} );
+
+	/* ---- Cell popover (mobile primarily) ----
+	 *
+	 * On a narrow viewport the bookings list inside each Limited cell is hidden
+	 * via CSS; users tap a cell to pop it open as a small card. Tap elsewhere,
+	 * tap the cell again, or press Esc to close. The class toggle runs at every
+	 * viewport (zero cost on desktop, CSS just doesn't reveal a popover there),
+	 * so there's no JS branching on width.
+	 *
+	 * Only cells with bookings (`.is-limited` plus a non-empty bookings list)
+	 * are interactive. Booked-all-day cells already say it all via the chip.
+	 */
+	function closeAllPopovers() {
+		document.querySelectorAll( '.shootcal-availability__day.is-open, .shootcal-availability__day.is-open-above' ).forEach( function ( c ) {
+			c.classList.remove( 'is-open' );
+			c.classList.remove( 'is-open-above' );
+			clearPopoverHorizontal( c );
+		} );
+	}
+
+	/**
+	 * Should this cell open ABOVE its position instead of below?
+	 * True when the cell is in the last visible row of its month grid
+	 * (where a below-popover would overflow into the credit area /
+	 * out of the visible page).
+	 */
+	function shouldOpenAbove( cell ) {
+		var month = cell.closest( '.shootcal-availability--month' );
+		if ( ! month ) return false;
+		var dayRows = month.querySelectorAll( '.shootcal-availability__week:not(.shootcal-availability__week--header)' );
+		if ( ! dayRows.length ) return false;
+		var lastRow = dayRows[ dayRows.length - 1 ];
+		return lastRow.contains( cell );
+	}
+
+	/**
+	 * The popover is allowed (via CSS) to grow wider than the cell so booking
+	 * times don't wrap. CSS centers it under the cell with translateX(-50%);
+	 * here we measure after open and shift the transform horizontally if it
+	 * would spill past the calendar card's left/right edge. Result: edge cells
+	 * get a popover that aligns to the card edge instead of overflowing.
+	 */
+	function adjustPopoverHorizontal( cell ) {
+		var wrap = cell.closest( '.shootcal-availability__wrap' );
+		var popover = cell.querySelector( '.shootcal-availability__bookings' );
+		if ( ! wrap || ! popover ) return;
+
+		// Reset any prior nudge so we measure the freshly-centered position.
+		popover.style.transform = '';
+
+		var wrapRect = wrap.getBoundingClientRect();
+		var popRect  = popover.getBoundingClientRect();
+		var GAP      = 6; // px breathing room at the calendar edge
+
+		var leftOverflow  = ( wrapRect.left + GAP ) - popRect.left;
+		var rightOverflow = popRect.right - ( wrapRect.right - GAP );
+
+		if ( leftOverflow > 0 ) {
+			popover.style.transform = 'translateX(calc(-50% + ' + leftOverflow + 'px))';
+		} else if ( rightOverflow > 0 ) {
+			popover.style.transform = 'translateX(calc(-50% - ' + rightOverflow + 'px))';
+		}
+	}
+
+	function clearPopoverHorizontal( cell ) {
+		var popover = cell.querySelector( '.shootcal-availability__bookings' );
+		if ( popover ) popover.style.transform = '';
+	}
+
+	document.addEventListener( 'click', function ( e ) {
+		var cell = e.target.closest && e.target.closest( '.shootcal-availability__day' );
+
+		// Tap outside any cell - close everything.
+		if ( ! cell ) {
+			closeAllPopovers();
+			return;
+		}
+
+		// Different cell tapped - close any previous before considering this one.
+		var openCell = document.querySelector( '.shootcal-availability__day.is-open' );
+		if ( openCell && openCell !== cell ) {
+			openCell.classList.remove( 'is-open' );
+			openCell.classList.remove( 'is-open-above' );
+			clearPopoverHorizontal( openCell );
+		}
+
+		// Only Limited cells with bookings are interactive.
+		if ( cell.classList.contains( 'is-limited' ) ) {
+			if ( cell.querySelector( '.shootcal-availability__bookings' ) ) {
+				var willOpen = ! cell.classList.contains( 'is-open' );
+				cell.classList.toggle( 'is-open' );
+				if ( willOpen ) {
+					// Decide direction at open-time so the choice can adapt to
+					// dynamic viewport changes (e.g. user rotated their phone
+					// since last open).
+					if ( shouldOpenAbove( cell ) ) {
+						cell.classList.add( 'is-open-above' );
+					} else {
+						cell.classList.remove( 'is-open-above' );
+					}
+					// Now that the popover is visible, measure + nudge if it
+					// would overflow the card horizontally.
+					adjustPopoverHorizontal( cell );
+				} else {
+					cell.classList.remove( 'is-open-above' );
+					clearPopoverHorizontal( cell );
+				}
+			}
+		}
+	} );
+
+	document.addEventListener( 'keydown', function ( e ) {
+		if ( e.key === 'Escape' ) {
+			closeAllPopovers();
+		}
+	} );
+} )();
