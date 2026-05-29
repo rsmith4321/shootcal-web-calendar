@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -110,6 +110,9 @@ This service is provided by Ryan Smith Photography. See the terms and privacy in
 1. The availability month grid on a page. Days are color coded: green for available, amber for limited (timed sessions only, with the booked time windows shown), red for fully booked.
 
 == Changelog ==
+
+= 1.0.1 =
+* Style hardening so the calendar looks the same across themes: the month and year label now stays sans-serif, the toolbar buttons stay light instead of inheriting a theme's dark button style, the weekday letters no longer show an underline or help cursor, and the booked times stay left-aligned. The month grid columns are also locked in so a theme cannot reflow them.
 
 = 1.0.0 =
 * First stable release of ShootCal Availability.

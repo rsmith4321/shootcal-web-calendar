@@ -152,6 +152,10 @@
 		border-radius: var(--shootcal-wrap-radius);
 		box-shadow: var(--shootcal-wrap-shadow);
 		overflow: hidden;
+		/* Self-contained sans-serif so the calendar reads consistently and does
+		 * not inherit a theme's serif heading/body font. !important because
+		 * themes set fonts with high-specificity selectors. */
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
 	}
 
 	/* --- Toolbar (Month Year | < Today >) --- */
@@ -168,6 +172,10 @@
 
 	.shootcal-availability__nav-label {
 		margin: 0;
+		/* Set directly (not just inherited) and !important: this is an <h2>, and a
+		 * theme's `h2 { font-family: <serif> }` is a direct match that would beat
+		 * an inherited font from the wrap. */
+		font-family: inherit !important;
 		font-size: 1.4rem;
 		font-weight: 800; /* heavier weight on the month name */
 		color: var(--shootcal-label-fg);
@@ -196,29 +204,34 @@
 		flex-shrink: 0;
 	}
 
+	/* Themes style raw <button> elements (dark fills, shadows, uppercase), which
+	 * would otherwise win over these. Force the light pill look with !important. */
 	.shootcal-availability__btn {
-		font: inherit;
+		font-family: inherit !important;
 		font-size: 0.85rem;
 		font-weight: 500;
-		background: #ffffff;
-		color: var(--shootcal-btn-fg);
-		border: 1px solid var(--shootcal-btn-border);
-		border-radius: 6px;
+		text-transform: none !important;
+		letter-spacing: normal !important;
+		background: #ffffff !important;
+		color: var(--shootcal-btn-fg) !important;
+		border: 1px solid var(--shootcal-btn-border) !important;
+		border-radius: 6px !important;
 		padding: 0.4rem 0.9rem;
 		cursor: pointer;
 		line-height: 1;
 		transition: background 0.1s ease, color 0.1s ease;
 		appearance: none;
 		-webkit-appearance: none;
-		box-shadow: none;
+		box-shadow: none !important;
+		text-shadow: none !important;
 	}
 	.shootcal-availability__btn:hover:not(:disabled) {
-		background: var(--shootcal-btn-hover-bg);
-		color: var(--shootcal-label-fg);
+		background: var(--shootcal-btn-hover-bg) !important;
+		color: var(--shootcal-label-fg) !important;
 	}
 	.shootcal-availability__btn:active:not(:disabled) {
-		background: var(--shootcal-btn-active-bg);
-		color: var(--shootcal-label-fg);
+		background: var(--shootcal-btn-active-bg) !important;
+		color: var(--shootcal-label-fg) !important;
 	}
 	.shootcal-availability__btn:focus-visible {
 		outline: 2px solid var(--shootcal-btn-focus);
@@ -234,20 +247,20 @@
 		font-size: 1.1rem;
 		padding: 0.35rem 0.7rem;
 		min-width: 2rem;
-		color: var(--shootcal-label-fg);
+		color: var(--shootcal-label-fg) !important;
 	}
 
 	/* Today button gets a brand-tinted hover/active state - subtle sunset wash
 	 * so the user feels the connection between the button and "today" highlight
 	 * in the grid. Uses rgba over the existing white bg. */
 	.shootcal-availability__btn--today:hover:not(:disabled) {
-		background: rgba( var(--shootcal-sunset-rgb), 0.08 );
-		border-color: rgba( var(--shootcal-sunset-rgb), 0.4 );
-		color: var(--shootcal-sunset);
+		background: rgba( var(--shootcal-sunset-rgb), 0.08 ) !important;
+		border-color: rgba( var(--shootcal-sunset-rgb), 0.4 ) !important;
+		color: var(--shootcal-sunset) !important;
 	}
 	.shootcal-availability__btn--today:active:not(:disabled) {
-		background: rgba( var(--shootcal-sunset-rgb), 0.16 );
-		border-color: rgba( var(--shootcal-sunset-rgb), 0.55 );
+		background: rgba( var(--shootcal-sunset-rgb), 0.16 ) !important;
+		border-color: rgba( var(--shootcal-sunset-rgb), 0.55 ) !important;
 	}
 
 	/* --- Viewport / month grid --- */
@@ -261,8 +274,8 @@
 	}
 
 	.shootcal-availability--month {
-		display: grid;
-		grid-template-columns: 1fr;
+		display: grid !important;
+		grid-template-columns: 1fr !important;
 	}
 
 	.shootcal-availability__caption {
@@ -276,8 +289,8 @@
 
 	/* Weekday header row */
 	.shootcal-availability__week--header {
-		display: grid;
-		grid-template-columns: repeat(7, minmax(0, 1fr));
+		display: grid !important;
+		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 		background: var(--shootcal-out-bg);
 		border-bottom: 1px solid var(--shootcal-grid-line);
 	}
@@ -290,15 +303,20 @@
 		text-align: center;
 		padding: 0.45rem 0;
 	}
-	.shootcal-availability__weekday abbr {
-		text-decoration: none;
-		border: none;
+	.shootcal-availability__weekday abbr,
+	.shootcal-availability__weekday abbr[title] {
+		/* Browsers + themes give abbr[title] a dotted underline and a help
+		 * (question-mark) cursor. Strip both; keep the title for accessibility. */
+		text-decoration: none !important;
+		border: none !important;
+		cursor: default !important;
+		font-weight: inherit;
 	}
 
 	/* Day rows */
 	.shootcal-availability__week {
-		display: grid;
-		grid-template-columns: repeat(7, minmax(0, 1fr));
+		display: grid !important;
+		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 	}
 	.shootcal-availability__week + .shootcal-availability__week {
 		border-top: 1px solid var(--shootcal-grid-line);
@@ -324,6 +342,8 @@
 		border-left: 1px solid var(--shootcal-grid-line);
 		box-sizing: border-box;
 		position: relative !important;
+		/* Themes can right-align text inside post content; keep cell text left. */
+		text-align: left !important;
 	}
 	.shootcal-availability__day:first-child { border-left: none; }
 
@@ -411,13 +431,14 @@
 		align-self: end !important;
 		list-style: none !important;
 		list-style-type: none !important;
-		margin: 0;
-		padding: 0.3rem 0 0;
+		margin: 0 !important;
+		padding: 0.3rem 0 0 !important;
 		font-size: 0.7rem;
 		line-height: 1.4;
 		font-weight: 500;
 		font-family: inherit;
 		background: transparent;
+		text-align: left !important;
 	}
 	.shootcal-availability__bookings li {
 		margin: 0 0 3px;
