@@ -112,9 +112,8 @@ This service is provided by Ryan Smith Photography. See the terms and privacy in
 == Changelog ==
 
 = 1.0.0 =
-* First release on the WordPress.org plugin directory.
-* The plugin now updates through WordPress.org. The previous GitHub-based update mechanism has been removed, since the directory is the canonical update source for listed plugins.
-* No changes to the calendar, settings, or block. Existing embeds keep working unchanged.
+* First stable release of ShootCal Availability.
+* No changes to the calendar, settings, or block from the prior build; existing embeds keep working unchanged.
 
 = 0.5.3 =
 * Plugin icon: the ShootCal app's shutter + calendar + sunset-gradient icon now shows next to the plugin in WP admin's Plugins list and update modal, matching the desktop app's identity. Icons are served from the GitHub repo so existing installs pick them up on the next update check (no new download needed beyond this one).

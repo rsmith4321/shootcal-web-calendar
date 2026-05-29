@@ -61,6 +61,14 @@ function bootstrap(): void {
 	( new Shortcode() )->register();
 	( new Block() )->register();
 	( new Assets() )->register();
+
+	// The GitHub Releases self-updater ships only in the build distributed from
+	// shootcal.com / GitHub. The WordPress.org build omits
+	// includes/class-updater.php (the directory is the update source there), so
+	// only wire it up when the file is actually present.
+	if ( file_exists( PLUGIN_DIR . 'includes/class-updater.php' ) ) {
+		( new Updater() )->register();
+	}
 }
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\bootstrap' );
 
