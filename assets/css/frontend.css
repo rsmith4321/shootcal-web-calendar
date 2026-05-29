@@ -49,13 +49,16 @@
 	--shootcal-wrap-bg: #ffffff;
 	--shootcal-wrap-border: #e5e7eb;
 	--shootcal-wrap-radius: 10px;
-	--shootcal-wrap-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+	/* Soft, layered elevation so the card lifts off the page like a macOS window. */
+	--shootcal-wrap-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.16), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
 
 	--shootcal-grid-line: #e5e7eb;
 	--shootcal-toolbar-border: #e5e7eb;
 
 	--shootcal-label-fg: #111827;
-	--shootcal-muted: #9ca3af;
+	/* #6b7280 (gray-500) clears WCAG AA 4.5:1 on the white card; the old #9ca3af
+	 * was ~2.5:1 and failed for the small weekday headers + muted text. */
+	--shootcal-muted: #6b7280;
 
 	--shootcal-btn-bg: transparent;
 	--shootcal-btn-fg: #374151;
@@ -96,15 +99,15 @@
 	 * rendered at 0.8 opacity at rest and 1.0 on hover via rgba(). The plugin's
 	 * Settings page exposes color pickers that emit overrides for these via an
 	 * inline <style> when the user picks non-default colors. */
-	--shootcal-limited-bg-rgb: 253, 242, 221; /* #fdf2dd default */
+	--shootcal-limited-bg-rgb: 252, 227, 168; /* #fce3a8 default */
 	--shootcal-limited-fg: #7a4f1a;
-	--shootcal-booked-bg-rgb:  250, 224, 207; /* #fae0cf default */
+	--shootcal-booked-bg-rgb:  246, 185, 163; /* #f6b9a3 default */
 	--shootcal-booked-fg: #7c3d18;
 
 	--shootcal-past-bg: #f9fafb;
 	--shootcal-past-fg: #b6bac0;
 	--shootcal-out-bg: #fafbfc;
-	--shootcal-credit-fg: #9ca3af;
+	--shootcal-credit-fg: #6b7280;
 }
 
 @layer shootcal-availability {
@@ -156,6 +159,28 @@
 		 * not inherit a theme's serif heading/body font. !important because
 		 * themes set fonts with high-specificity selectors. */
 		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+		animation: shootcal-fade-in 0.35s ease both;
+	}
+
+	@keyframes shootcal-fade-in {
+		from { opacity: 0; transform: translateY(4px); }
+		to   { opacity: 1; transform: none; }
+	}
+	@media ( prefers-reduced-motion: reduce ) {
+		.shootcal-availability__wrap { animation: none; }
+	}
+
+	/* AJAX "Page caching" mode: placeholder shown until JS swaps in the calendar.
+	 * Reuses the card chrome via the __wrap class. */
+	.shootcal-availability__lazy {
+		min-height: 8rem;
+		align-items: center;
+		justify-content: center;
+	}
+	.shootcal-availability__lazy-msg {
+		margin: 0;
+		color: var(--shootcal-muted);
+		font-size: 0.85rem;
 	}
 
 	/* --- Toolbar (Month Year | < Today >) --- */
@@ -245,8 +270,8 @@
 	.shootcal-availability__btn--prev,
 	.shootcal-availability__btn--next {
 		font-size: 1.1rem;
-		padding: 0.35rem 0.7rem;
-		min-width: 2rem;
+		padding: 9px 10px 10px 10px;
+		min-width: 3rem;
 		color: var(--shootcal-label-fg) !important;
 	}
 
@@ -411,12 +436,17 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		font-weight: 700;
-		opacity: 0.7;
+		opacity: 0.85; /* was 0.7 - lifted so the status label keeps AA contrast */
 		line-height: 1;
 	}
 
-	/* Don't shout "Available" on every open day - emptiness is the cue. */
-	.shootcal-availability__day.is-available .shootcal-availability__status {
+	/* Hide the visible status word on Available and Limited days: emptiness is
+	 * the cue for Available, and on Limited days the booked times + amber tint +
+	 * legend already say "Limited". Booked days keep their label (they have no
+	 * times, so the word is their only on-cell cue). The cell's aria-label still
+	 * announces the status for screen readers in every case. */
+	.shootcal-availability__day.is-available .shootcal-availability__status,
+	.shootcal-availability__day.is-limited .shootcal-availability__status {
 		display: none;
 	}
 
@@ -457,6 +487,17 @@
 	.shootcal-availability__bookings li::before {
 		content: none !important; /* defeat any theme rule that injects bullet glyphs */
 	}
+
+	/* "+N more" overflow: a cell shows up to 2 booking times inline plus a
+	 * "+N more" hint; the open popover reveals the rest and hides the hint, so
+	 * busy days keep a uniform cell height. */
+	.shootcal-availability__booking--overflow { display: none; }
+	.shootcal-availability__booking--more {
+		opacity: 0.8;
+		font-weight: 600;
+	}
+	.shootcal-availability__day.is-open .shootcal-availability__booking--overflow { display: list-item; }
+	.shootcal-availability__day.is-open .shootcal-availability__booking--more { display: none; }
 
 	/* --- Click-to-expand popover (all viewports) ---
 	 *
@@ -508,8 +549,12 @@
 		min-width: 100%;
 		width: max-content;
 		max-width: 16rem;
-		margin: 0;
-		padding: 0.55rem 0.8rem 0.75rem;
+		margin: 0 !important;
+		/* !important required: the base .__bookings rule sets padding with
+		 * !important (for theme defense), so the popover's padding must also be
+		 * !important to win, otherwise the bubble loses its left/right padding. */
+		padding: 1rem 1.5rem !important;
+		text-align: center !important;
 		background-color: rgba( var(--shootcal-limited-bg-rgb), 1 );
 		color: var(--shootcal-limited-fg);
 		border-radius: 10px;
@@ -572,10 +617,27 @@
 		 * line - hide it. Users tap to see the full popover instead. */
 		.shootcal-availability__bookings { display: none; }
 
-		/* Tighter popover padding on phones. */
+		/* Since the times are hidden on phones, show a small dot on Limited days
+		 * so visitors know the cell is tappable for the booked times. (Booked days
+		 * keep their "BOOKED" label; Available days have nothing to show.) */
+		.shootcal-availability__day.is-limited::after {
+			content: '';
+			position: absolute;
+			left: 50%;
+			bottom: 6px;
+			transform: translateX(-50%);
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: var(--shootcal-sunset);
+		}
+		.shootcal-availability__day.is-limited.is-open::after { display: none; }
+
+		/* Tighter popover padding on phones. !important to beat the base
+		 * .__bookings padding rule (itself !important for theme defense). */
 		.shootcal-availability__day.is-open .shootcal-availability__bookings {
 			font-size: 0.72rem;
-			padding: 0.5rem 0.6rem 0.6rem;
+			padding: 0.7rem 0.85rem !important;
 		}
 	}
 
@@ -587,6 +649,44 @@
 	.no-js .shootcal-availability__toolbar { display: none; }
 	.no-js .shootcal-availability__wrap--paginated .shootcal-availability__caption {
 		display: block;
+	}
+
+	/* --- Legend (color key) --- */
+	.shootcal-availability__legend {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem 1.4rem;
+		margin: 0;
+		padding: 0.75rem 1rem;
+		list-style: none;
+		border-top: 1px solid var(--shootcal-grid-line);
+		font-size: 0.85rem;
+		color: var(--shootcal-muted);
+	}
+	.shootcal-availability__legend-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0;
+		list-style: none;
+	}
+	.shootcal-availability__legend-swatch {
+		display: inline-block;
+		width: 1rem;
+		height: 1rem;
+		border-radius: 3px;
+		flex-shrink: 0;
+	}
+	.shootcal-availability__legend-swatch--available {
+		background: var(--shootcal-available-bg);
+		box-shadow: inset 0 0 0 1px var(--shootcal-grid-line);
+	}
+	.shootcal-availability__legend-swatch--limited {
+		background: rgba( var(--shootcal-limited-bg-rgb), 1 );
+	}
+	.shootcal-availability__legend-swatch--booked {
+		background: rgba( var(--shootcal-booked-bg-rgb), 1 );
 	}
 
 	/* --- Attribution --- */

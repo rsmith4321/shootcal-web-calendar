@@ -135,21 +135,6 @@
 	}
 
 	/**
-	 * Should this cell open ABOVE its position instead of below?
-	 * True when the cell is in the last visible row of its month grid
-	 * (where a below-popover would overflow into the credit area /
-	 * out of the visible page).
-	 */
-	function shouldOpenAbove( cell ) {
-		var month = cell.closest( '.shootcal-availability--month' );
-		if ( ! month ) return false;
-		var dayRows = month.querySelectorAll( '.shootcal-availability__week:not(.shootcal-availability__week--header)' );
-		if ( ! dayRows.length ) return false;
-		var lastRow = dayRows[ dayRows.length - 1 ];
-		return lastRow.contains( cell );
-	}
-
-	/**
 	 * The popover is allowed (via CSS) to grow wider than the cell so booking
 	 * times don't wrap. CSS centers it under the cell with translateX(-50%);
 	 * here we measure after open and shift the transform horizontally if it
@@ -206,14 +191,11 @@
 				var willOpen = ! cell.classList.contains( 'is-open' );
 				cell.classList.toggle( 'is-open' );
 				if ( willOpen ) {
-					// Decide direction at open-time so the choice can adapt to
-					// dynamic viewport changes (e.g. user rotated their phone
-					// since last open).
-					if ( shouldOpenAbove( cell ) ) {
-						cell.classList.add( 'is-open-above' );
-					} else {
-						cell.classList.remove( 'is-open-above' );
-					}
+					// Always open downward. On the last row the popover simply
+					// overflows below the calendar card (the wrap is
+					// overflow:visible), which reads better than flipping up and
+					// covering the events in the row above.
+					cell.classList.remove( 'is-open-above' );
 					// Now that the popover is visible, measure + nudge if it
 					// would overflow the card horizontally.
 					adjustPopoverHorizontal( cell );
@@ -230,4 +212,44 @@
 			closeAllPopovers();
 		}
 	} );
+
+	/* --- AJAX hydration (only used when "Page caching" mode is on) ---
+	 * The page ships a lightweight placeholder so it stays fully page-cacheable;
+	 * here we fetch the freshly-rendered calendar from admin-ajax (which the page
+	 * cache doesn't store) and swap it in. The delegated click/keydown handlers
+	 * above then work on the injected markup without any re-binding. */
+	function hydrateLazy() {
+		if ( typeof window.ShootCalAvailabilityFront === 'undefined' ) return;
+		var boxes = document.querySelectorAll( '.shootcal-availability__lazy[data-shootcal-lazy]' );
+		boxes.forEach( function ( box ) {
+			var body = new URLSearchParams();
+			body.set( 'action', 'shootcal_availability_render' );
+			if ( box.dataset.shootcalMonths ) body.set( 'months', box.dataset.shootcalMonths );
+			if ( typeof box.dataset.shootcalFirstDay !== 'undefined' ) body.set( 'first_day', box.dataset.shootcalFirstDay );
+			if ( box.dataset.shootcalTimezone ) body.set( 'timezone', box.dataset.shootcalTimezone );
+
+			fetch( window.ShootCalAvailabilityFront.ajaxUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString(),
+				credentials: 'same-origin'
+			} ).then( function ( r ) {
+				return r.ok ? r.text() : '';
+			} ).then( function ( html ) {
+				if ( html ) {
+					box.outerHTML = html;
+				} else {
+					box.removeAttribute( 'data-shootcal-lazy' );
+				}
+			} ).catch( function () {
+				box.removeAttribute( 'data-shootcal-lazy' );
+			} );
+		} );
+	}
+
+	if ( document.readyState !== 'loading' ) {
+		hydrateLazy();
+	} else {
+		document.addEventListener( 'DOMContentLoaded', hydrateLazy );
+	}
 } )();

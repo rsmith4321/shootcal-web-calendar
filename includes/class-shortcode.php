@@ -17,32 +17,104 @@ class Shortcode {
 
 	public function register(): void {
 		add_shortcode( self::TAG, array( $this, 'render' ) );
+		add_action( 'wp_ajax_shootcal_availability_render', array( $this, 'handle_ajax_render' ) );
+		add_action( 'wp_ajax_nopriv_shootcal_availability_render', array( $this, 'handle_ajax_render' ) );
+	}
+
+	/**
+	 * Shortcode/block entry point. In AJAX mode this returns a lightweight
+	 * placeholder that JavaScript hydrates after the (cacheable) page loads;
+	 * otherwise it renders the calendar server-side as usual.
+	 *
+	 * @param array<string,string>|string $atts
+	 */
+	public function render( $atts = array() ): string {
+		if ( ! empty( Settings::get_options()['ajax_render'] ) ) {
+			return $this->render_lazy_placeholder( is_array( $atts ) ? $atts : array() );
+		}
+		return $this->render_calendar( $atts );
+	}
+
+	/**
+	 * Placeholder emitted in AJAX mode. Carries only non-sensitive display
+	 * overrides (months / first day / timezone) as data attributes - the
+	 * calendar URL is never exposed to the page; the AJAX endpoint reads it from
+	 * settings server-side.
+	 *
+	 * @param array<string,string> $atts
+	 */
+	private function render_lazy_placeholder( array $atts ): string {
+		$data = '';
+		if ( isset( $atts['months'] ) && (int) $atts['months'] > 0 ) {
+			$data .= ' data-shootcal-months="' . esc_attr( (string) (int) $atts['months'] ) . '"';
+		}
+		if ( isset( $atts['first_day'] ) ) {
+			$data .= ' data-shootcal-first-day="' . esc_attr( ( '1' === (string) $atts['first_day'] ) ? '1' : '0' ) . '"';
+		}
+		if ( ! empty( $atts['timezone'] ) ) {
+			$data .= ' data-shootcal-timezone="' . esc_attr( (string) $atts['timezone'] ) . '"';
+		}
+		return '<div class="shootcal-availability__wrap shootcal-availability__lazy" data-shootcal-lazy' . $data . '>'
+			. '<p class="shootcal-availability__lazy-msg">' . esc_html__( 'Loading availability…', 'shootcal-availability' ) . '</p>'
+			. '</div>';
+	}
+
+	/**
+	 * AJAX endpoint: render the calendar fresh, bypassing full-page caches.
+	 * Public (logged-in + logged-out), read-only. Only bounded display params
+	 * are accepted; the calendar URL always comes from settings, so this cannot
+	 * be used to fetch an arbitrary URL.
+	 */
+	public function handle_ajax_render(): void {
+		$atts = array();
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- public read-only render; no state change and no nonce to verify.
+		if ( isset( $_POST['months'] ) ) {
+			$months = (int) $_POST['months'];
+			if ( $months > 0 ) {
+				$atts['months'] = (string) min( 36, $months );
+			}
+		}
+		if ( isset( $_POST['first_day'] ) ) {
+			$atts['first_day'] = ( '1' === (string) $_POST['first_day'] ) ? '1' : '0';
+		}
+		if ( isset( $_POST['timezone'] ) ) {
+			$tz = sanitize_text_field( wp_unslash( (string) $_POST['timezone'] ) );
+			if ( '' !== $tz ) {
+				$atts['timezone'] = $tz;
+			}
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+		nocache_headers();
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_calendar() escapes all dynamic values as it builds the markup.
+		echo $this->render_calendar( $atts );
+		wp_die();
 	}
 
 	/**
 	 * @param array<string,string>|string $atts
 	 */
-	public function render( $atts = array() ): string {
+	private function render_calendar( $atts = array() ): string {
 		$opts = Settings::get_options();
-
-		// For Google source, default months comes from settings.
-		// For ShootCal source, default is empty string meaning "auto-detect from feed".
-		// The shortcode `months` attribute (if explicitly set) still works as an override/cap.
-		$default_months = ( 'shootcal' === $opts['source'] ) ? '' : (string) $opts['months_ahead'];
 
 		$atts = shortcode_atts(
 			array(
-				'months'      => $default_months,
+				// Months is resolved after we know the source (below); blank means
+				// "use the setting / auto-detect from the feed".
+				'months'      => '',
 				'first_day'   => (string) $opts['first_day_of_week'],
 				// Timezone default is intentionally empty so resolve_timezone()
-				// can prefer the feed's X-WR-TIMEZONE header for ShootCal source
+				// can prefer the feed's X-WR-TIMEZONE header for a ShootCal source
 				// over the saved settings value. Only an explicit timezone="..."
-				// attribute on the shortcode counts as a manual override.
+				// attribute counts as a manual override.
 				'timezone'    => '',
 			),
 			is_array( $atts ) ? $atts : array(),
 			self::TAG
 		);
+
+		// The calendar URL is configured once in Settings; the source (ShootCal
+		// vs generic iCal) is detected from that URL's host.
+		$source = $this->source_for_url( Settings::get_active_url() );
 
 		$attr_months  = (int) $atts['months']; // 0 if empty / not provided
 		$first_dow    = ( 1 === (int) $atts['first_day'] ) ? 1 : 0;
@@ -63,7 +135,7 @@ class Shortcode {
 		// if their WordPress site is on UTC defaults - no manual setup needed.
 		$tz = $this->resolve_timezone(
 			(string) $atts['timezone'],
-			(string) $opts['source'],
+			$source,
 			$ical,
 			(string) $opts['timezone']
 		);
@@ -79,7 +151,7 @@ class Shortcode {
 		//   - ShootCal source: auto-detect from latest event in the feed (start of
 		//     current month -> month containing the last event), capped by `months`
 		//     attr if provided. Falls back to 3 months for an empty feed.
-		if ( 'shootcal' === $opts['source'] ) {
+		if ( 'shootcal' === $source ) {
 			$months_ahead = $this->auto_detect_months( $events, $window_start, $tz );
 			if ( $attr_months > 0 ) {
 				$months_ahead = min( $months_ahead, $attr_months );
@@ -146,7 +218,7 @@ class Shortcode {
 			$cursor = $cursor->modify( '+1 month' );
 		}
 
-		$credit       = $this->credit_html( (string) $opts['source'] );
+		$credit       = $this->legend_html( $multi_session_day ) . $this->credit_html( $source );
 		$inline_style = $this->color_override_style( $opts );
 
 		// Single month: skip the toolbar - nothing to navigate.
@@ -164,13 +236,13 @@ class Shortcode {
 	 * and 100% on hover (the user-chosen color is the hover/peak color).
 	 */
 	private function color_override_style( array $opts ): string {
-		$limited_rgb = $this->hex_to_rgb_triplet( (string) ( $opts['limited_color'] ?? '#fdf2dd' ) );
-		$booked_rgb  = $this->hex_to_rgb_triplet( (string) ( $opts['booked_color']  ?? '#fae0cf' ) );
+		$limited_rgb = $this->hex_to_rgb_triplet( (string) ( $opts['limited_color'] ?? '#fce3a8' ) );
+		$booked_rgb  = $this->hex_to_rgb_triplet( (string) ( $opts['booked_color']  ?? '#f6b9a3' ) );
 
 		// Only emit overrides for non-default values, to keep page weight tiny.
 		$defaults = array(
-			'253, 242, 221' => true, // #fdf2dd
-			'250, 224, 207' => true, // #fae0cf
+			'252, 227, 168' => true, // #fce3a8
+			'246, 185, 163' => true, // #f6b9a3
 		);
 		if ( isset( $defaults[ $limited_rgb ] ) && isset( $defaults[ $booked_rgb ] ) ) {
 			return '';
@@ -193,7 +265,7 @@ class Shortcode {
 			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
 		}
 		if ( ! preg_match( '/^[0-9a-fA-F]{6}$/', $hex ) ) {
-			return '253, 242, 221'; // soft default (matches Limited bg)
+			return '252, 227, 168'; // soft default (matches Limited bg)
 		}
 		return (string) hexdec( substr( $hex, 0, 2 ) ) . ', ' .
 		       (string) hexdec( substr( $hex, 2, 2 ) ) . ', ' .
@@ -279,6 +351,29 @@ class Shortcode {
 	 * Attribution line shown beneath the grid when the data source is ShootCal.
 	 * Returns an empty string for the Google source - no credit is owed there.
 	 */
+	/**
+	 * Compact color key beneath the grid. Per-cell aria-labels already convey
+	 * status to screen readers, so the swatches are decorative (aria-hidden);
+	 * the text labels stay readable. "Limited" is omitted when the photographer
+	 * has turned off multi-session days (then there is no Limited state).
+	 */
+	private function legend_html( bool $multi_session_day ): string {
+		$items = array( array( 'available', __( 'Available', 'shootcal-availability' ) ) );
+		if ( $multi_session_day ) {
+			$items[] = array( 'limited', __( 'Limited', 'shootcal-availability' ) );
+		}
+		$items[] = array( 'booked', __( 'Booked', 'shootcal-availability' ) );
+
+		$out = '<ul class="shootcal-availability__legend">';
+		foreach ( $items as $item ) {
+			$out .= '<li class="shootcal-availability__legend-item">'
+				. '<span class="shootcal-availability__legend-swatch shootcal-availability__legend-swatch--' . esc_attr( $item[0] ) . '" aria-hidden="true"></span>'
+				. esc_html( $item[1] )
+				. '</li>';
+		}
+		return $out . '</ul>';
+	}
+
 	private function credit_html( string $source ): string {
 		if ( 'shootcal' !== $source ) {
 			return '';
@@ -293,6 +388,20 @@ class Shortcode {
 			esc_html__( 'Calendar provided by %s by Ryan Smith Photography', 'shootcal-availability' ),
 			$link // already escaped above
 		) . '</p>';
+	}
+
+	/**
+	 * Detect the source type from a calendar URL: a *.shootcal.com URL is a
+	 * ShootCal feed (unlocks timezone + months auto-detection and the credit
+	 * line); anything else is a generic iCal feed, handled the same way a Google
+	 * Calendar feed is. An empty URL falls back to the generic path.
+	 */
+	private function source_for_url( string $url ): string {
+		if ( '' === $url ) {
+			return 'google';
+		}
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+		return ( is_string( $host ) && preg_match( '/(^|\.)shootcal\.com$/i', $host ) ) ? 'shootcal' : 'google';
 	}
 
 	/**

@@ -160,11 +160,24 @@ class Month_Grid {
 			// "Booked" days the time list is redundant (it would just repeat
 			// "All day"), so we omit it.
 			if ( $has_timed && ! $has_full_day ) {
-				$out .= '<ul class="shootcal-availability__bookings">';
+				$timed = array();
 				foreach ( $covering as $event ) {
 					if ( ! $event->all_day ) {
-						$out .= '<li>' . esc_html( $this->format_booking_window( $event, $day_local, $tz ) ) . '</li>';
+						$timed[] = $event;
 					}
+				}
+				$limit = 2; // show at most 2 inline; the rest sit behind "+N more"
+				$out  .= '<ul class="shootcal-availability__bookings">';
+				foreach ( $timed as $i => $event ) {
+					$overflow = ( $i >= $limit ) ? ' shootcal-availability__booking--overflow' : '';
+					$out     .= '<li class="shootcal-availability__booking' . $overflow . '">' . esc_html( $this->format_booking_window( $event, $day_local, $tz ) ) . '</li>';
+				}
+				$extra = count( $timed ) - $limit;
+				if ( $extra > 0 ) {
+					$out .= '<li class="shootcal-availability__booking--more">' . esc_html(
+						/* translators: %d: number of additional bookings hidden behind the "more" indicator. */
+						sprintf( _n( '+%d more', '+%d more', $extra, 'shootcal-availability' ), $extra )
+					) . '</li>';
 				}
 				$out .= '</ul>';
 			}

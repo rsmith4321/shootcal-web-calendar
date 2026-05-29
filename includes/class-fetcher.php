@@ -19,17 +19,21 @@ class Fetcher {
 	 * @return string|\WP_Error iCal body on success, WP_Error on failure.
 	 */
 	public function get_ical_text() {
-		$cached = get_transient( CACHE_KEY );
+		$url = Settings::get_active_url();
+		if ( '' === $url ) {
+			return new \WP_Error( 'shootcal_availability_no_url', __( 'No calendar URL configured. Add an iCal URL on the settings page, or paste one into the block.', 'shootcal-availability' ) );
+		}
+
+		$cache_key = self::cache_key( $url );
+		$cached    = get_transient( $cache_key );
 		if ( is_string( $cached ) && '' !== $cached ) {
 			return $cached;
 		}
 
-		$url = Settings::get_active_url();
-		if ( '' === $url ) {
-			return new \WP_Error( 'shootcal_availability_no_url', __( 'No calendar URL configured. Choose a source on the settings page and paste your iCal URL.', 'shootcal-availability' ) );
-		}
-
-		$response = wp_remote_get(
+		// wp_safe_remote_get blocks requests to private/loopback addresses and
+		// non-standard ports, so accepting an arbitrary iCal URL cannot be turned
+		// into a server-side request forgery against internal services.
+		$response = wp_safe_remote_get(
 			$url,
 			array(
 				'timeout'     => 10,
@@ -62,7 +66,26 @@ class Fetcher {
 			return new \WP_Error( 'shootcal_availability_bad_body', __( 'Calendar response did not look like an iCal feed.', 'shootcal-availability' ) );
 		}
 
-		set_transient( CACHE_KEY, $body, CACHE_TTL );
+		set_transient( $cache_key, $body, CACHE_TTL );
 		return $body;
+	}
+
+	/**
+	 * Per-URL, versioned transient key. Bumping the version (flush_cache) makes
+	 * every cached feed unreachable at once - that's how the "Clear cache" button
+	 * and a settings change invalidate everything despite the per-URL keys.
+	 */
+	private static function cache_key( string $url ): string {
+		$ver = (int) get_option( 'shootcal_availability_cache_ver', 0 );
+		return CACHE_KEY . '_' . $ver . '_' . md5( $url );
+	}
+
+	/**
+	 * Invalidate all cached feeds by bumping the cache version. The old
+	 * transients become unreachable and expire on their own TTL.
+	 */
+	public static function flush_cache(): void {
+		$ver = (int) get_option( 'shootcal_availability_cache_ver', 0 );
+		update_option( 'shootcal_availability_cache_ver', $ver + 1 );
 	}
 }

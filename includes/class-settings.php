@@ -48,33 +48,24 @@ class Settings {
 			)
 		);
 
-		// Source section: pick where the calendar data comes from.
+		// Calendar source: a single iCal URL. The source (ShootCal vs generic
+		// iCal) is detected automatically from the URL, so there's no toggle.
 		add_settings_section(
 			self::SECTION_SOURCE,
 			__( 'Calendar source', 'shootcal-availability' ),
 			static function (): void {
-				echo '<p>' . esc_html__( 'Choose where this plugin reads your availability from. Both options serve the same iCal format and render the same way; only the data source differs.', 'shootcal-availability' ) . '</p>';
+				echo '<p>' . esc_html__( 'Paste the iCal URL of the calendar you want to show. It can be a Google Calendar secret iCal address, an Apple or Outlook iCal feed, or a ShootCal feed URL. The plugin detects the type automatically. A ShootCal feed adds extra control: it hides your personal events, builds availability from your session types, and auto-detects your timezone and how many months to show.', 'shootcal-availability' ) . '</p>';
 			},
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'source', __( 'Source', 'shootcal-availability' ),
-			array( $this, 'field_source' ), self::PAGE_SLUG, self::SECTION_SOURCE );
-		add_settings_field( 'ical_url', __( 'Google Calendar iCal URL', 'shootcal-availability' ),
-			array( $this, 'field_ical_url' ), self::PAGE_SLUG, self::SECTION_SOURCE,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--google' ) );
-		add_settings_field( 'shootcal_feed_url', __( 'ShootCal feed URL', 'shootcal-availability' ),
-			array( $this, 'field_shootcal_feed_url' ), self::PAGE_SLUG, self::SECTION_SOURCE,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--shootcal' ) );
+		add_settings_field( 'calendar_url', __( 'Calendar URL', 'shootcal-availability' ),
+			array( $this, 'field_calendar_url' ), self::PAGE_SLUG, self::SECTION_SOURCE );
 
 		// Display section: how the grid renders.
 		add_settings_section( self::SECTION_DISPLAY, __( 'Display', 'shootcal-availability' ), '__return_false', self::PAGE_SLUG );
 		add_settings_field( 'months_ahead', __( 'Months to show', 'shootcal-availability' ),
-			array( $this, 'field_months_ahead' ), self::PAGE_SLUG, self::SECTION_DISPLAY,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--google-only' ) );
-		add_settings_field( 'months_ahead_shootcal_note', __( 'Months to show', 'shootcal-availability' ),
-			array( $this, 'field_months_shootcal_note' ), self::PAGE_SLUG, self::SECTION_DISPLAY,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--shootcal-only' ) );
+			array( $this, 'field_months_ahead' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'first_day_of_week', __( 'First day of week', 'shootcal-availability' ),
 			array( $this, 'field_first_day_of_week' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'multi_session_day', __( 'Sessions per day', 'shootcal-availability' ),
@@ -84,134 +75,100 @@ class Settings {
 		add_settings_field( 'booked_color', __( 'Booked day color', 'shootcal-availability' ),
 			array( $this, 'field_booked_color' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'timezone', __( 'Display timezone', 'shootcal-availability' ),
-			array( $this, 'field_timezone' ), self::PAGE_SLUG, self::SECTION_DISPLAY,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--google-only' ) );
-		add_settings_field( 'timezone_shootcal_note', __( 'Display timezone', 'shootcal-availability' ),
-			array( $this, 'field_timezone_shootcal_note' ), self::PAGE_SLUG, self::SECTION_DISPLAY,
-			array( 'class' => 'shootcal-availability__row shootcal-availability__row--shootcal-only' ) );
+			array( $this, 'field_timezone' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
+		add_settings_field( 'ajax_render', __( 'Page caching', 'shootcal-availability' ),
+			array( $this, 'field_ajax_render' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 	}
 
 	public static function get_options(): array {
 		$defaults = array(
-			'source'            => 'google',
-			'ical_url'          => '',
-			'shootcal_feed_url' => '',
+			'calendar_url'      => '',
 			'months_ahead'      => 3,
 			'first_day_of_week' => 0,
 			'multi_session_day' => true,
-			'limited_color'     => '#fdf2dd',
-			'booked_color'      => '#fae0cf',
+			'limited_color'     => '#fce3a8',
+			'booked_color'      => '#f6b9a3',
 			'timezone'          => wp_timezone_string(),
+			'ajax_render'       => false,
 		);
-		$options  = get_option( OPTION_KEY, array() );
-		return wp_parse_args( is_array( $options ) ? $options : array(), $defaults );
+
+		$options = get_option( OPTION_KEY, array() );
+		$options = is_array( $options ) ? $options : array();
+
+		// Migrate the pre-1.1 split fields (source + ical_url + shootcal_feed_url)
+		// into the single calendar_url. Read-time fallback so existing installs
+		// keep working immediately; the old keys are dropped on the next save.
+		if ( ! isset( $options['calendar_url'] ) ) {
+			$legacy_is_shootcal      = isset( $options['source'] ) && 'shootcal' === $options['source'];
+			$options['calendar_url'] = $legacy_is_shootcal
+				? (string) ( $options['shootcal_feed_url'] ?? '' )
+				: (string) ( $options['ical_url'] ?? '' );
+		}
+
+		// Installs that never changed the cell colors have the pre-1.1.9 defaults
+		// saved; bump them to the new, more-distinct defaults so they aren't stuck
+		// on the old near-identical tints. Genuinely custom colors are left alone.
+		if ( isset( $options['limited_color'] ) && '#fdf2dd' === strtolower( (string) $options['limited_color'] ) ) {
+			$options['limited_color'] = '#fce3a8';
+		}
+		if ( isset( $options['booked_color'] ) && '#fae0cf' === strtolower( (string) $options['booked_color'] ) ) {
+			$options['booked_color'] = '#f6b9a3';
+		}
+
+		return wp_parse_args( $options, $defaults );
 	}
 
 	/**
-	 * Returns the URL the fetcher should use, based on the chosen source.
+	 * The single configured calendar URL the fetcher should use.
 	 */
 	public static function get_active_url(): string {
-		$opts = self::get_options();
-		return 'shootcal' === $opts['source']
-			? (string) $opts['shootcal_feed_url']
-			: (string) $opts['ical_url'];
+		return (string) self::get_options()['calendar_url'];
 	}
 
 	public function sanitize( $input ): array {
-		$existing = get_option( OPTION_KEY );
-		$existing = is_array( $existing ) ? $existing : array();
+		$existing = self::get_options();
 		$out      = self::get_options();
 
-		$out['source'] = ( isset( $input['source'] ) && 'shootcal' === $input['source'] ) ? 'shootcal' : 'google';
+		// Drop the legacy split-source keys; we now store a single URL.
+		unset( $out['source'], $out['ical_url'], $out['shootcal_feed_url'] );
 
-		$out['ical_url']          = isset( $input['ical_url'] ) ? esc_url_raw( trim( (string) $input['ical_url'] ) ) : '';
-		$out['shootcal_feed_url'] = isset( $input['shootcal_feed_url'] ) ? esc_url_raw( trim( (string) $input['shootcal_feed_url'] ) ) : '';
-
-		// Soft validation: warn (via settings_errors) when a URL doesn't look right.
-		if ( 'shootcal' === $out['source'] && '' !== $out['shootcal_feed_url'] ) {
-			$host = wp_parse_url( $out['shootcal_feed_url'], PHP_URL_HOST );
-			if ( ! is_string( $host ) || ! preg_match( '/(^|\.)shootcal\.com$/i', $host ) ) {
-				add_settings_error( OPTION_KEY, 'shootcal_url_host', __( 'The ShootCal feed URL should be on the shootcal.com domain. Double-check the URL you copied from the app.', 'shootcal-availability' ), 'warning' );
-			}
-		}
-		if ( 'google' === $out['source'] && '' !== $out['ical_url'] ) {
-			$host = wp_parse_url( $out['ical_url'], PHP_URL_HOST );
-			if ( is_string( $host ) && preg_match( '/(^|\.)shootcal\.com$/i', $host ) ) {
-				add_settings_error( OPTION_KEY, 'google_url_host', __( 'You pasted a shootcal.com URL but selected Google as the source. Switch source to ShootCal, or paste a calendar.google.com iCal URL.', 'shootcal-availability' ), 'warning' );
-			}
-		}
+		$out['calendar_url'] = isset( $input['calendar_url'] ) ? esc_url_raw( trim( (string) $input['calendar_url'] ) ) : '';
 
 		$out['months_ahead']      = isset( $input['months_ahead'] ) ? max( 1, min( 36, (int) $input['months_ahead'] ) ) : 3;
 		$out['first_day_of_week'] = isset( $input['first_day_of_week'] ) ? ( 1 === (int) $input['first_day_of_week'] ? 1 : 0 ) : 0;
 		$out['multi_session_day'] = ! empty( $input['multi_session_day'] );
+		$out['ajax_render']       = ! empty( $input['ajax_render'] );
 
 		// Color pickers - sanitize_hex_color returns null on bad input, fall back to default.
-		$out['limited_color'] = sanitize_hex_color( isset( $input['limited_color'] ) ? (string) $input['limited_color'] : '' ) ?: '#fdf2dd';
-		$out['booked_color']  = sanitize_hex_color( isset( $input['booked_color'] )  ? (string) $input['booked_color']  : '' ) ?: '#fae0cf';
-		$out['timezone']          = isset( $input['timezone'] ) ? sanitize_text_field( (string) $input['timezone'] ) : wp_timezone_string();
+		$out['limited_color'] = sanitize_hex_color( isset( $input['limited_color'] ) ? (string) $input['limited_color'] : '' ) ?: '#fce3a8';
+		$out['booked_color']  = sanitize_hex_color( isset( $input['booked_color'] )  ? (string) $input['booked_color']  : '' ) ?: '#f6b9a3';
+		$out['timezone']      = isset( $input['timezone'] ) ? sanitize_text_field( (string) $input['timezone'] ) : wp_timezone_string();
 
-		// If the active URL changed (or the source changed), drop the cache so the user sees fresh data.
-		$old_active = self::active_url_from( $existing );
-		$new_active = self::active_url_from( $out );
-		if ( $old_active !== $new_active ) {
-			delete_transient( CACHE_KEY );
+		// If the URL changed, drop the cache so the user sees fresh data.
+		if ( (string) $existing['calendar_url'] !== $out['calendar_url'] ) {
+			Fetcher::flush_cache();
 		}
 
 		return $out;
 	}
 
-	private static function active_url_from( array $opts ): string {
-		$source = isset( $opts['source'] ) && 'shootcal' === $opts['source'] ? 'shootcal' : 'google';
-		return 'shootcal' === $source ? (string) ( $opts['shootcal_feed_url'] ?? '' ) : (string) ( $opts['ical_url'] ?? '' );
-	}
-
 	// --- Field renderers -------------------------------------------------
 
-	public function field_source(): void {
-		$opts = self::get_options();
-		$src  = (string) $opts['source'];
-		?>
-		<fieldset>
-			<label>
-				<input type="radio" name="<?php echo esc_attr( OPTION_KEY ); ?>[source]" value="google" <?php checked( $src, 'google' ); ?> data-shootcal-source="google" />
-				<strong><?php esc_html_e( 'Google Calendar', 'shootcal-availability' ); ?></strong>
-				<span class="description"><?php esc_html_e( '— paste a secret iCal URL from Google Calendar.', 'shootcal-availability' ); ?></span>
-			</label><br />
-			<label>
-				<input type="radio" name="<?php echo esc_attr( OPTION_KEY ); ?>[source]" value="shootcal" <?php checked( $src, 'shootcal' ); ?> data-shootcal-source="shootcal" />
-				<strong><?php esc_html_e( 'ShootCal', 'shootcal-availability' ); ?></strong>
-				<span class="description"><?php esc_html_e( '— paste a feed URL from the ShootCal Mac app (Settings > Connect to your website).', 'shootcal-availability' ); ?></span>
-			</label>
-		</fieldset>
-		<?php
-	}
-
-	public function field_ical_url(): void {
+	public function field_calendar_url(): void {
 		$opts = self::get_options();
 		printf(
-			'<input type="url" name="%1$s[ical_url]" id="ical_url" value="%2$s" class="regular-text code" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" autocomplete="off" />',
+			'<input type="url" name="%1$s[calendar_url]" id="calendar_url" value="%2$s" class="regular-text code" placeholder="https://" autocomplete="off" />',
 			esc_attr( OPTION_KEY ),
-			esc_attr( $opts['ical_url'] )
+			esc_attr( $opts['calendar_url'] )
 		);
-		echo '<p class="description">' . esc_html__( 'Google Calendar > Settings of your calendar > Integrate calendar > Secret address in iCal format. Treat this URL like a password.', 'shootcal-availability' ) . '</p>';
-		$this->render_test_button( 'google' );
+		echo '<p class="description">' . esc_html__( 'Google Calendar: open your calendar\'s settings, scroll to Integrate calendar, and copy the Secret address in iCal format. ShootCal: open the Mac app, go to Settings > Website > Connect to your website, and click Copy URL. Treat this URL like a password.', 'shootcal-availability' ) . '</p>';
+		$this->render_test_button();
 	}
 
-	public function field_shootcal_feed_url(): void {
-		$opts = self::get_options();
-		printf(
-			'<input type="url" name="%1$s[shootcal_feed_url]" id="shootcal_feed_url" value="%2$s" class="regular-text code" placeholder="https://feed.shootcal.com/&lt;token&gt;.ics" autocomplete="off" />',
-			esc_attr( OPTION_KEY ),
-			esc_attr( $opts['shootcal_feed_url'] )
-		);
-		echo '<p class="description">' . esc_html__( 'Open the ShootCal Mac app, go to Settings > Website > Connect to your website, click Copy URL, then paste here.', 'shootcal-availability' ) . '</p>';
-		$this->render_test_button( 'shootcal' );
-	}
-
-	private function render_test_button( string $source ): void {
+	private function render_test_button(): void {
 		?>
 		<p>
-			<button type="button" class="button" data-shootcal-test="<?php echo esc_attr( $source ); ?>">
+			<button type="button" class="button" id="shootcal-test-connection">
 				<?php esc_html_e( 'Test connection', 'shootcal-availability' ); ?>
 			</button>
 			<span class="spinner" style="float:none; margin-left:6px;"></span>
@@ -227,15 +184,7 @@ class Settings {
 			esc_attr( OPTION_KEY ),
 			(int) $opts['months_ahead']
 		);
-		echo ' <span class="description">' . esc_html__( 'Including the current month. Up to 36 (3 years) for wedding photographers and others booking far out. Year tabs appear automatically when the range spans more than one calendar year.', 'shootcal-availability' ) . '</span>';
-	}
-
-	public function field_months_shootcal_note(): void {
-		echo '<p class="description" style="margin:0;">' . esc_html__( 'Auto-detected from the ShootCal feed. To change how far ahead is shown, open the ShootCal Mac app and adjust the push horizon under Settings > Website. Year tabs appear automatically when the range spans more than one calendar year.', 'shootcal-availability' ) . '</p>';
-	}
-
-	public function field_timezone_shootcal_note(): void {
-		echo '<p class="description" style="margin:0;">' . esc_html__( 'Auto-detected from the ShootCal feed (the feed includes the timezone you use in the Mac app). Falls back to your WordPress general timezone setting if the feed does not specify one.', 'shootcal-availability' ) . '</p>';
+		echo ' <span class="description">' . esc_html__( 'Including the current month, up to 36 (3 years). Year tabs appear automatically when the range spans more than one calendar year. ShootCal feeds auto-detect this from the feed, so this setting is ignored for them.', 'shootcal-availability' ) . '</span>';
 	}
 
 	public function field_first_day_of_week(): void {
@@ -297,9 +246,22 @@ class Settings {
 		echo '<p class="description">';
 		printf(
 			/* translators: %s: example IANA timezone identifier. */
-			esc_html__( 'IANA timezone identifier, e.g. %s. Defaults to your WordPress timezone.', 'shootcal-availability' ),
+			esc_html__( 'IANA timezone identifier, e.g. %s. Defaults to your WordPress timezone. ShootCal feeds auto-detect the timezone from the feed.', 'shootcal-availability' ),
 			'<code>America/New_York</code>'
 		);
+		echo '</p>';
+	}
+
+	public function field_ajax_render(): void {
+		$opts = self::get_options();
+		printf(
+			'<label><input type="checkbox" name="%1$s[ajax_render]" id="ajax_render" value="1"%2$s /> %3$s</label>',
+			esc_attr( OPTION_KEY ),
+			checked( ! empty( $opts['ajax_render'] ), true, false ),
+			esc_html__( 'Load the calendar with JavaScript after the page loads.', 'shootcal-availability' )
+		);
+		echo '<p class="description">';
+		esc_html_e( 'Turn this on if your site uses full-page caching (e.g. Varnish or a page-cache plugin). The page itself stays cached, but the calendar is fetched fresh on each visit, so availability never gets stuck behind a long page cache. Leave off otherwise.', 'shootcal-availability' );
 		echo '</p>';
 	}
 
@@ -341,7 +303,7 @@ class Settings {
 			wp_die( esc_html__( 'You do not have permission.', 'shootcal-availability' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( self::NONCE_CLEAR_CACHE );
-		delete_transient( CACHE_KEY );
+		Fetcher::flush_cache();
 		wp_safe_redirect(
 			add_query_arg(
 				array( 'page' => self::PAGE_SLUG, 'cache_cleared' => '1' ),
@@ -367,9 +329,9 @@ class Settings {
 				'action'  => self::AJAX_TEST_HOOK,
 				'nonce'   => wp_create_nonce( self::AJAX_TEST_HOOK ),
 				'i18n'    => array(
-					'testing'        => __( 'Testing…', 'shootcal-availability' ),
-					'enterUrl'       => __( 'Please enter a URL above first.', 'shootcal-availability' ),
-					'networkError'   => __( 'Network error while testing.', 'shootcal-availability' ),
+					'testing'      => __( 'Testing…', 'shootcal-availability' ),
+					'enterUrl'     => __( 'Please enter a URL above first.', 'shootcal-availability' ),
+					'networkError' => __( 'Network error while testing.', 'shootcal-availability' ),
 				),
 			)
 		);
@@ -386,7 +348,10 @@ class Settings {
 			wp_send_json_error( array( 'message' => __( 'No URL provided.', 'shootcal-availability' ) ) );
 		}
 
-		$response = wp_remote_get(
+		// Match the front-end fetch: wp_safe_remote_get so the test reflects what
+		// will actually happen at render time (and can't be used to probe internal
+		// hosts).
+		$response = wp_safe_remote_get(
 			$url,
 			array(
 				'timeout'    => 10,

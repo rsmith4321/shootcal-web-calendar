@@ -1,8 +1,12 @@
 /* ShootCal Availability - block editor script (vanilla JS, no build).
  *
- * Registers the `shootcal-availability/calendar` block as a server-rendered
- * block. The edit view uses wp.serverSideRender so the editor preview is the
- * actual rendered calendar (same code path as the frontend), not a placeholder.
+ * Registers the `shootcal-availability/calendar` block. The editor view shows a
+ * static placeholder card with a Calendar URL field (paste a feed right into the
+ * block, like the core Embed block) - NOT a live render. The frontend stylesheet
+ * isn't loaded in the editor, so a server render of the real grid collapses into
+ * an unstyled list; and re-rendering the live feed on every keystroke is
+ * wasteful. The actual calendar is emitted by the PHP render callback on the
+ * published page.
  *
  * No JSX, no bundler. Uses createElement directly so the file can be loaded as
  * a normal script with the WP global script handles as dependencies.
@@ -16,9 +20,9 @@
 	var useBlockProps     = wp.blockEditor.useBlockProps;
 	var InspectorControls = wp.blockEditor.InspectorControls;
 	var PanelBody         = wp.components.PanelBody;
+	var Placeholder       = wp.components.Placeholder;
 	var TextControl       = wp.components.TextControl;
 	var SelectControl     = wp.components.SelectControl;
-	var ServerSideRender  = wp.serverSideRender;
 	var __                = wp.i18n.__;
 
 	registerBlockType( 'shootcal-availability/calendar', {
@@ -69,23 +73,22 @@
 				)
 			);
 
+			// Override summary shown under the URL field.
+			var summaryBits = [];
+			summaryBits.push( monthsValue ? __( 'Months: ', 'shootcal-availability' ) + monthsValue : __( 'Months: default', 'shootcal-availability' ) );
+			summaryBits.push( ( firstDayValue === '1' ) ? __( 'Week starts Monday', 'shootcal-availability' ) : __( 'Week starts Sunday', 'shootcal-availability' ) );
+			summaryBits.push( timezoneValue ? __( 'Timezone: ', 'shootcal-availability' ) + timezoneValue : __( 'Timezone: auto', 'shootcal-availability' ) );
+
+			// Static placeholder. The live calendar only renders on the published
+			// page; the calendar source is configured once under Settings.
 			var preview = el( 'div', blockProps,
-				el( ServerSideRender, {
-					block: 'shootcal-availability/calendar',
-					attributes: attributes,
-					EmptyResponsePlaceholder: function () {
-						return el( 'div', { style: { padding: '1rem', border: '1px dashed #c3c4c7', borderRadius: '6px', color: '#646970' } },
-							__( 'No availability to display yet. Configure your calendar source under Settings > ShootCal Availability.', 'shootcal-availability' )
-						);
-					},
-					ErrorResponsePlaceholder: function ( props ) {
-						return el( 'div', { style: { padding: '1rem', border: '1px solid #d63638', borderRadius: '6px', color: '#7f1d1d', background: '#fff5f5' } },
-							el( 'strong', null, __( 'ShootCal Availability:', 'shootcal-availability' ) ),
-							' ',
-							( props && props.response && props.response.errorMsg ) || __( 'Could not render the calendar preview.', 'shootcal-availability' )
-						);
-					}
-				} )
+				el( Placeholder, {
+					icon: 'calendar-alt',
+					label: __( 'ShootCal Availability', 'shootcal-availability' ),
+					instructions: __( 'Your availability calendar renders here on the published page. Set the calendar URL once under Settings > ShootCal Availability. Use the block settings on the right to override months, first day, or timezone for this embed.', 'shootcal-availability' )
+				},
+					el( 'p', { style: { margin: 0, fontSize: '12px', color: '#646970' } }, summaryBits.join( '  •  ' ) )
+				)
 			);
 
 			return el( Fragment, null, sidebar, preview );

@@ -32,6 +32,14 @@ class Assets {
 			VERSION,
 			array( 'in_footer' => true, 'strategy' => 'defer' )
 		);
+		// Used by the AJAX ("Page caching") render mode to fetch the calendar
+		// from admin-ajax after the cached page loads. Harmless when that mode is
+		// off (no placeholder exists for the script to hydrate).
+		wp_localize_script(
+			'shootcal-availability',
+			'ShootCalAvailabilityFront',
+			array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ) )
+		);
 	}
 
 	/**

@@ -2,27 +2,13 @@
 ( function ( $ ) {
 	'use strict';
 
-	function applySourceVisibility() {
-		var source = $( 'input[name$="[source]"]:checked' ).val() || 'google';
-		// URL fields
-		$( '.shootcal-availability__row--google' ).toggle( source === 'google' );
-		$( '.shootcal-availability__row--shootcal' ).toggle( source === 'shootcal' );
-		// Display-section rows scoped by source (months_ahead vs. its ShootCal hint)
-		$( '.shootcal-availability__row--google-only' ).toggle( source === 'google' );
-		$( '.shootcal-availability__row--shootcal-only' ).toggle( source === 'shootcal' );
-	}
-
-	$( document ).on( 'change', 'input[name$="[source]"]', applySourceVisibility );
-
-	$( document ).on( 'click', 'button[data-shootcal-test]', function ( e ) {
+	$( document ).on( 'click', '#shootcal-test-connection', function ( e ) {
 		e.preventDefault();
-		var $btn       = $( this );
-		var source     = $btn.data( 'shootcalTest' );
-		var inputId    = source === 'shootcal' ? '#shootcal_feed_url' : '#ical_url';
-		var url        = ( $( inputId ).val() || '' ).trim();
-		var $row       = $btn.closest( 'p' );
-		var $spinner   = $row.find( '.spinner' );
-		var $result    = $row.find( '.shootcal-availability__test-result' );
+		var $btn     = $( this );
+		var url      = ( $( '#calendar_url' ).val() || '' ).trim();
+		var $row     = $btn.closest( 'p' );
+		var $spinner = $row.find( '.spinner' );
+		var $result  = $row.find( '.shootcal-availability__test-result' );
 
 		$result.removeClass( 'is-success is-error' ).text( '' );
 
@@ -52,6 +38,4 @@
 			$spinner.css( 'visibility', 'hidden' );
 		} );
 	} );
-
-	$( applySourceVisibility );
 } )( jQuery );

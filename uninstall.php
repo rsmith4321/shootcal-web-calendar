@@ -8,6 +8,7 @@
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 delete_option( 'shootcal_availability_options' );
+delete_option( 'shootcal_availability_cache_ver' );
 delete_transient( 'shootcal_availability_ical' );
 
 // Clean up the cached release check left behind by pre-1.0 builds distributed
