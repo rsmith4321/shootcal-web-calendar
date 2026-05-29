@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.5.3
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,7 +87,34 @@ The iCal feed is cached for 10 minutes. You can force an immediate refresh from 
 
 Example: `[shootcal_availability months="2" show_times="1"]`
 
+== External Services ==
+
+This plugin reads availability from a calendar feed URL that you configure on its settings page. The request is made from your web server (not your visitor's browser) whenever the month grid is rendered and the 10 minute cache has expired. The plugin only ever contacts the feed URL you choose; if no URL is configured, it makes no external requests.
+
+Depending on the source you select, the request goes to one of these services:
+
+**Google Calendar**
+
+When you choose "Google Calendar" as the source and paste a secret iCal address, the plugin requests that URL from Google's calendar servers (calendar.google.com). Only the request itself is sent (the secret address you provide). No data from your site or your visitors is transmitted. The response is your calendar in iCal format, from which the plugin keeps only busy start and end times and discards all event titles, locations, attendees, and descriptions.
+
+This service is provided by Google. See Google's Terms of Service (https://policies.google.com/terms) and Privacy Policy (https://policies.google.com/privacy).
+
+**ShootCal**
+
+When you choose "ShootCal" as the source and paste a feed URL from the ShootCal Mac app, the plugin requests that URL from the ShootCal feed service (feed.shootcal.com). Only the request itself is sent. No data from your site or your visitors is transmitted. The response is an already privacy-filtered iCal feed containing only busy times.
+
+This service is provided by Ryan Smith Photography. See the terms and privacy information at https://shootcal.com.
+
+== Screenshots ==
+
+1. The availability month grid on a page. Days are color coded: green for available, amber for limited (timed sessions only, with the booked time windows shown), red for fully booked.
+
 == Changelog ==
+
+= 1.0.0 =
+* First release on the WordPress.org plugin directory.
+* The plugin now updates through WordPress.org. The previous GitHub-based update mechanism has been removed, since the directory is the canonical update source for listed plugins.
+* No changes to the calendar, settings, or block. Existing embeds keep working unchanged.
 
 = 0.5.3 =
 * Plugin icon: the ShootCal app's shutter + calendar + sunset-gradient icon now shows next to the plugin in WP admin's Plugins list and update modal, matching the desktop app's identity. Icons are served from the GitHub repo so existing installs pick them up on the next update check (no new download needed beyond this one).
