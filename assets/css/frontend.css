@@ -309,7 +309,11 @@
 		color: var(--shootcal-label-fg);
 		padding: 0.75rem 1rem;
 		margin: 0;
-		border-bottom: 1px solid var(--shootcal-grid-line);
+		/* !important on all the grid divider lines: a theme reset like
+		 * `* { border: 0 }` (Tailwind preflight, some normalize variants) would
+		 * otherwise strip these non-important layered borders and the grid would
+		 * lose its internal + closing lines. */
+		border-bottom: 1px solid var(--shootcal-grid-line) !important;
 	}
 
 	/* Weekday header row */
@@ -317,7 +321,7 @@
 		display: grid !important;
 		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 		background: var(--shootcal-out-bg);
-		border-bottom: 1px solid var(--shootcal-grid-line);
+		border-bottom: 1px solid var(--shootcal-grid-line) !important;
 	}
 	.shootcal-availability__weekday {
 		font-size: 0.7rem;
@@ -344,7 +348,7 @@
 		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 	}
 	.shootcal-availability__week + .shootcal-availability__week {
-		border-top: 1px solid var(--shootcal-grid-line);
+		border-top: 1px solid var(--shootcal-grid-line) !important;
 	}
 
 	/* --- Day cell (flat, no rounded pills, joined by 1px lines) ---
@@ -364,13 +368,13 @@
 		padding: 0.4rem 0.55rem 0.5rem;
 		background: var(--shootcal-available-bg);
 		color: var(--shootcal-available-fg);
-		border-left: 1px solid var(--shootcal-grid-line);
+		border-left: 1px solid var(--shootcal-grid-line) !important;
 		box-sizing: border-box;
 		position: relative !important;
 		/* Themes can right-align text inside post content; keep cell text left. */
 		text-align: left !important;
 	}
-	.shootcal-availability__day:first-child { border-left: none; }
+	.shootcal-availability__day:first-child { border-left: none !important; }
 
 	/* Three busy states - the user picks the "peak" color via Settings; the cell
 	 * renders at 0.8 opacity at rest and rises to 1.0 (full) on hover or when
@@ -667,7 +671,9 @@
 		margin: 0 !important;
 		padding: 0.75rem 1rem !important;
 		list-style: none !important;
-		border-top: 1px solid var(--shootcal-grid-line);
+		/* The line ABOVE the legend - closes the bottom of the grid. !important so
+		 * a theme `ul { border: 0 }` reset can't strip it. */
+		border-top: 1px solid var(--shootcal-grid-line) !important;
 		font-size: 0.85rem;
 		color: var(--shootcal-muted);
 	}
@@ -713,7 +719,9 @@
 		line-height: 1.4;
 		color: var(--shootcal-credit-fg);
 		text-align: right !important;
-		border-top: 1px solid var(--shootcal-grid-line);
+		/* The line BELOW the legend (separating it from the credit). !important so
+		 * a theme `p { border: 0 }` reset can't strip it. */
+		border-top: 1px solid var(--shootcal-grid-line) !important;
 		background: var(--shootcal-out-bg);
 		box-sizing: border-box;
 	}
