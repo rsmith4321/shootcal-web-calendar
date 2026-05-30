@@ -1,14 +1,14 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
-	"name": "shootcal-availability/calendar",
+	"name": "shootcal-web-calendar/calendar",
 	"version": "1.0.0",
-	"title": "ShootCal Availability",
+	"title": "ShootCal Web Calendar",
 	"category": "widgets",
 	"icon": "calendar-alt",
-	"description": "Show your photography availability as a month grid. Reads from your ShootCal app feed or a Google Calendar secret iCal URL configured in Settings > ShootCal Availability.",
+	"description": "Show an iCal calendar as a month grid - free/busy availability or a full calendar with event titles and times. Paste the feed URL right in the block.",
 	"keywords": [ "calendar", "availability", "booking", "photographer", "shootcal" ],
-	"textdomain": "shootcal-availability",
+	"textdomain": "shootcal-web-calendar",
 	"supports": {
 		"html": false,
 		"align": [ "wide", "full" ],
@@ -26,7 +26,19 @@
 		},
 		"firstDay": {
 			"type": "number"
+		},
+		"mode": {
+			"type": "string",
+			"default": "availability"
+		},
+		"url": {
+			"type": "string",
+			"default": ""
+		},
+		"multiSessionDay": {
+			"type": "boolean",
+			"default": true
 		}
 	},
-	"editorScript": "shootcal-availability-block-editor"
+	"editorScript": "shootcal-web-calendar-block-editor"
 }

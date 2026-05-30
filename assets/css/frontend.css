@@ -1,4 +1,4 @@
-/* ShootCal Availability - frontend month grid + paginated toolbar.
+/* ShootCal Web Calendar - frontend month grid + paginated toolbar.
  *
  * ============================================================================
  *  Theming / override paths for site owners (read me first if you're a theme dev):
@@ -8,7 +8,7 @@
  *     The whole calendar is themed via the variables below. Override them
  *     anywhere outside the plugin layer to recolor without touching selectors:
  *
- *        .shootcal-availability__wrap {
+ *        .shootcal-web-calendar__wrap {
  *            --shootcal-booked-bg: #ffe4e6;
  *            --shootcal-wrap-radius: 4px;
  *            --shootcal-label-fg: #333;
@@ -32,7 +32,7 @@
  *        --shootcal-credit-fg                          attribution color
  *
  *  2. SELECTOR OVERRIDES
- *     All plugin styles are wrapped in @layer shootcal-availability. Any
+ *     All plugin styles are wrapped in @layer shootcal-web-calendar. Any
  *     unlayered CSS in the theme will WIN over these without any !important
  *     gymnastics. Just write a normal rule in your theme stylesheet and it
  *     takes precedence.
@@ -45,7 +45,7 @@
 
 /* Variables live OUTSIDE the layer so they're easy to override globally without
  * having to think about layer cascade. */
-.shootcal-availability__wrap {
+.shootcal-web-calendar__wrap {
 	--shootcal-wrap-bg: #ffffff;
 	--shootcal-wrap-border: #e5e7eb;
 	--shootcal-wrap-radius: 10px;
@@ -110,7 +110,7 @@
 	--shootcal-credit-fg: #6b7280;
 }
 
-@layer shootcal-availability {
+@layer shootcal-web-calendar {
 
 	/* === Defense against inadvertent wrapping ===
 	 *
@@ -125,16 +125,16 @@
 	 * making them `display: contents` (their children become direct children
 	 * of the grid container) and stripping the code-like font + background.
 	 *
-	 * The user-visible fix is to use the "ShootCal Availability" block instead
+	 * The user-visible fix is to use the "ShootCal Web Calendar" block instead
 	 * of a shortcode in a code-formatted paragraph, but defending in CSS means
 	 * the calendar still renders correctly even when the editor mistake happens.
 	 */
-	.shootcal-availability__wrap code,
-	.shootcal-availability__wrap pre,
-	.shootcal-availability__wrap kbd,
-	.shootcal-availability__wrap samp,
-	.shootcal-availability__day code,
-	.shootcal-availability__day pre {
+	.shootcal-web-calendar__wrap code,
+	.shootcal-web-calendar__wrap pre,
+	.shootcal-web-calendar__wrap kbd,
+	.shootcal-web-calendar__wrap samp,
+	.shootcal-web-calendar__day code,
+	.shootcal-web-calendar__day pre {
 		display: contents !important;
 		font-family: inherit !important;
 		background: transparent !important;
@@ -146,7 +146,7 @@
 
 	/* --- Card wrap --- */
 
-	.shootcal-availability__wrap {
+	.shootcal-web-calendar__wrap {
 		display: flex;
 		flex-direction: column;
 		margin: 1.5rem 0;
@@ -167,17 +167,17 @@
 		to   { opacity: 1; transform: none; }
 	}
 	@media ( prefers-reduced-motion: reduce ) {
-		.shootcal-availability__wrap { animation: none; }
+		.shootcal-web-calendar__wrap { animation: none; }
 	}
 
 	/* AJAX "Page caching" mode: placeholder shown until JS swaps in the calendar.
 	 * Reuses the card chrome via the __wrap class. */
-	.shootcal-availability__lazy {
+	.shootcal-web-calendar__lazy {
 		min-height: 8rem;
 		align-items: center;
 		justify-content: center;
 	}
-	.shootcal-availability__lazy-msg {
+	.shootcal-web-calendar__lazy-msg {
 		margin: 0;
 		color: var(--shootcal-muted);
 		font-size: 0.85rem;
@@ -185,7 +185,7 @@
 
 	/* --- Toolbar (Month Year | < Today >) --- */
 
-	.shootcal-availability__toolbar {
+	.shootcal-web-calendar__toolbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -195,7 +195,7 @@
 		background: var(--shootcal-wrap-bg);
 	}
 
-	.shootcal-availability__nav-label {
+	.shootcal-web-calendar__nav-label {
 		margin: 0;
 		/* Set directly (not just inherited) and !important: this is an <h2>, and a
 		 * theme's `h2 { font-family: <serif> }` is a direct match that would beat
@@ -211,7 +211,7 @@
 	/* Year accent in the toolbar label - matches the desktop app: signature
 	 * sunset color, slightly smaller + lighter weight than the month name so
 	 * the eye reads month first, year as supporting context. */
-	.shootcal-availability__nav-year {
+	.shootcal-web-calendar__nav-year {
 		color: var(--shootcal-sunset);
 		font-size: 0.82em;     /* ~82% of parent = ~1.15rem when label is 1.4rem */
 		font-weight: 600;      /* lighter than the 800 month name */
@@ -222,7 +222,7 @@
 	/* Three discrete buttons grouped by a small gap. No shared pill container,
 	 * no negative-offset outline tricks - keeps focus rings + active states
 	 * from intersecting with sibling borders. */
-	.shootcal-availability__nav {
+	.shootcal-web-calendar__nav {
 		display: inline-flex;
 		align-items: stretch;
 		gap: 0.3rem;
@@ -231,7 +231,7 @@
 
 	/* Themes style raw <button> elements (dark fills, shadows, uppercase), which
 	 * would otherwise win over these. Force the light pill look with !important. */
-	.shootcal-availability__btn {
+	.shootcal-web-calendar__btn {
 		font-family: inherit !important;
 		font-size: 0.85rem;
 		font-weight: 500;
@@ -250,25 +250,25 @@
 		box-shadow: none !important;
 		text-shadow: none !important;
 	}
-	.shootcal-availability__btn:hover:not(:disabled) {
+	.shootcal-web-calendar__btn:hover:not(:disabled) {
 		background: var(--shootcal-btn-hover-bg) !important;
 		color: var(--shootcal-label-fg) !important;
 	}
-	.shootcal-availability__btn:active:not(:disabled) {
+	.shootcal-web-calendar__btn:active:not(:disabled) {
 		background: var(--shootcal-btn-active-bg) !important;
 		color: var(--shootcal-label-fg) !important;
 	}
-	.shootcal-availability__btn:focus-visible {
+	.shootcal-web-calendar__btn:focus-visible {
 		outline: 2px solid var(--shootcal-btn-focus);
 		outline-offset: 2px;
 	}
-	.shootcal-availability__btn:disabled {
+	.shootcal-web-calendar__btn:disabled {
 		opacity: 0.4;
 		cursor: default;
 	}
 
-	.shootcal-availability__btn--prev,
-	.shootcal-availability__btn--next {
+	.shootcal-web-calendar__btn--prev,
+	.shootcal-web-calendar__btn--next {
 		font-size: 1.1rem;
 		padding: 9px 10px 10px 10px;
 		min-width: 3rem;
@@ -278,32 +278,32 @@
 	/* Today button gets a brand-tinted hover/active state - subtle sunset wash
 	 * so the user feels the connection between the button and "today" highlight
 	 * in the grid. Uses rgba over the existing white bg. */
-	.shootcal-availability__btn--today:hover:not(:disabled) {
+	.shootcal-web-calendar__btn--today:hover:not(:disabled) {
 		background: rgba( var(--shootcal-sunset-rgb), 0.08 ) !important;
 		border-color: rgba( var(--shootcal-sunset-rgb), 0.4 ) !important;
 		color: var(--shootcal-sunset) !important;
 	}
-	.shootcal-availability__btn--today:active:not(:disabled) {
+	.shootcal-web-calendar__btn--today:active:not(:disabled) {
 		background: rgba( var(--shootcal-sunset-rgb), 0.16 ) !important;
 		border-color: rgba( var(--shootcal-sunset-rgb), 0.55 ) !important;
 	}
 
 	/* --- Viewport / month grid --- */
 
-	.shootcal-availability__viewport { position: relative; }
-	.shootcal-availability__month-panel { display: block; }
-	.shootcal-availability__month-panel[hidden] { display: none; }
+	.shootcal-web-calendar__viewport { position: relative; }
+	.shootcal-web-calendar__month-panel { display: block; }
+	.shootcal-web-calendar__month-panel[hidden] { display: none; }
 
-	.shootcal-availability__wrap--paginated .shootcal-availability__caption {
+	.shootcal-web-calendar__wrap--paginated .shootcal-web-calendar__caption {
 		display: none;
 	}
 
-	.shootcal-availability--month {
+	.shootcal-web-calendar--month {
 		display: grid !important;
 		grid-template-columns: 1fr !important;
 	}
 
-	.shootcal-availability__caption {
+	.shootcal-web-calendar__caption {
 		font-size: 1.15rem;
 		font-weight: 600;
 		color: var(--shootcal-label-fg);
@@ -317,13 +317,13 @@
 	}
 
 	/* Weekday header row */
-	.shootcal-availability__week--header {
+	.shootcal-web-calendar__week--header {
 		display: grid !important;
 		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 		background: var(--shootcal-out-bg);
 		border-bottom: 1px solid var(--shootcal-grid-line) !important;
 	}
-	.shootcal-availability__weekday {
+	.shootcal-web-calendar__weekday {
 		font-size: 0.7rem;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -332,8 +332,8 @@
 		text-align: center;
 		padding: 0.45rem 0;
 	}
-	.shootcal-availability__weekday abbr,
-	.shootcal-availability__weekday abbr[title] {
+	.shootcal-web-calendar__weekday abbr,
+	.shootcal-web-calendar__weekday abbr[title] {
 		/* Browsers + themes give abbr[title] a dotted underline and a help
 		 * (question-mark) cursor. Strip both; keep the title for accessibility. */
 		text-decoration: none !important;
@@ -343,11 +343,11 @@
 	}
 
 	/* Day rows */
-	.shootcal-availability__week {
+	.shootcal-web-calendar__week {
 		display: grid !important;
 		grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
 	}
-	.shootcal-availability__week + .shootcal-availability__week {
+	.shootcal-web-calendar__week + .shootcal-web-calendar__week {
 		border-top: 1px solid var(--shootcal-grid-line) !important;
 	}
 
@@ -359,7 +359,7 @@
 	 * regardless of whether sibling cells in the row force the cell to grow.
 	 * This is more deterministic than the flex auto-margin trick (which can
 	 * lose to theme CSS that flips the cell to display:block). */
-	.shootcal-availability__day {
+	.shootcal-web-calendar__day {
 		display: grid !important;
 		grid-template-rows: auto auto 1fr !important;
 		row-gap: 0;
@@ -374,50 +374,50 @@
 		/* Themes can right-align text inside post content; keep cell text left. */
 		text-align: left !important;
 	}
-	.shootcal-availability__day:first-child { border-left: none !important; }
+	.shootcal-web-calendar__day:first-child { border-left: none !important; }
 
 	/* Three busy states - the user picks the "peak" color via Settings; the cell
 	 * renders at 0.8 opacity at rest and rises to 1.0 (full) on hover or when
 	 * a popover is open. Computed via rgba() against the RGB triplet variables
 	 * so override is a single style override. */
-	.shootcal-availability__day.is-booked {
+	.shootcal-web-calendar__day.is-booked {
 		background: rgba( var(--shootcal-booked-bg-rgb), 0.8 );
 		color: var(--shootcal-booked-fg);
 		transition: background-color 0.12s ease;
 	}
-	.shootcal-availability__day.is-limited {
+	.shootcal-web-calendar__day.is-limited {
 		background: rgba( var(--shootcal-limited-bg-rgb), 0.8 );
 		color: var(--shootcal-limited-fg);
 		transition: background-color 0.12s ease;
 	}
 	/* On hover and when opened, the cells lift to 100% of their picked color. */
-	.shootcal-availability__day.is-booked:hover {
+	.shootcal-web-calendar__day.is-booked:hover {
 		background: rgba( var(--shootcal-booked-bg-rgb), 1 );
 	}
-	.shootcal-availability__day.is-limited:hover,
-	.shootcal-availability__day.is-limited.is-open,
-	.shootcal-availability__day.is-limited.is-open-above {
+	.shootcal-web-calendar__day.is-limited:hover,
+	.shootcal-web-calendar__day.is-limited.is-open,
+	.shootcal-web-calendar__day.is-limited.is-open-above {
 		background: rgba( var(--shootcal-limited-bg-rgb), 1 );
 	}
 
 	/* Out-of-month cells render their events with the same state coloring as
 	 * in-month cells (matches the macOS app's month view). The only visual
 	 * cue that a cell belongs to a different month is the muted date number. */
-	.shootcal-availability__day.is-out-of-month .shootcal-availability__date {
+	.shootcal-web-calendar__day.is-out-of-month .shootcal-web-calendar__date {
 		color: var(--shootcal-muted);
 		font-weight: 500;
 	}
-	.shootcal-availability__day.is-past {
+	.shootcal-web-calendar__day.is-past {
 		background: var(--shootcal-past-bg);
 		color: var(--shootcal-past-fg);
 	}
-	.shootcal-availability__day.is-past .shootcal-availability__date {
+	.shootcal-web-calendar__day.is-past .shootcal-web-calendar__date {
 		font-weight: 500;
 	}
 
 	/* Today: just color the date number in the brighter sunset-vivid so it
 	 * pops at small sizes. No background bubble (was distorting cell layout). */
-	.shootcal-availability__day.is-today .shootcal-availability__date {
+	.shootcal-web-calendar__day.is-today .shootcal-web-calendar__date {
 		color: var(--shootcal-sunset-vivid);
 		font-weight: 700;
 	}
@@ -425,7 +425,7 @@
 	/* Date number - explicit BLOCK so date + status always stack regardless of
 	 * any inherited inline rules from the theme. Mandatory bottom margin
 	 * gives the chip room to breathe. */
-	.shootcal-availability__date {
+	.shootcal-web-calendar__date {
 		display: block;
 		font-weight: 600;
 		font-size: 0.95rem;
@@ -434,7 +434,7 @@
 	}
 
 	/* Status chip - small uppercase label below the date */
-	.shootcal-availability__status {
+	.shootcal-web-calendar__status {
 		display: block;
 		font-size: 0.6rem;
 		text-transform: uppercase;
@@ -449,8 +449,8 @@
 	 * legend already say "Limited". Booked days keep their label (they have no
 	 * times, so the word is their only on-cell cue). The cell's aria-label still
 	 * announces the status for screen readers in every case. */
-	.shootcal-availability__day.is-available .shootcal-availability__status,
-	.shootcal-availability__day.is-limited .shootcal-availability__status {
+	.shootcal-web-calendar__day.is-available .shootcal-web-calendar__status,
+	.shootcal-web-calendar__day.is-limited .shootcal-web-calendar__status {
 		display: none;
 	}
 
@@ -460,7 +460,7 @@
 	 * The `li` rules explicitly reset font-family / background / list-style
 	 * so theme CSS that targets generic `ul`/`li` in post content can't make
 	 * the booked times look like a code block or get a default bullet. */
-	.shootcal-availability__bookings {
+	.shootcal-web-calendar__bookings {
 		grid-row: 3 !important;
 		align-self: end !important;
 		list-style: none !important;
@@ -474,7 +474,7 @@
 		background: transparent;
 		text-align: left !important;
 	}
-	.shootcal-availability__bookings li {
+	.shootcal-web-calendar__bookings li {
 		margin: 0 0 3px;
 		padding: 0;
 		background: transparent;
@@ -487,21 +487,21 @@
 		min-width: 0;
 		list-style: none;
 	}
-	.shootcal-availability__bookings li:last-child { margin-bottom: 0; }
-	.shootcal-availability__bookings li::before {
+	.shootcal-web-calendar__bookings li:last-child { margin-bottom: 0; }
+	.shootcal-web-calendar__bookings li::before {
 		content: none !important; /* defeat any theme rule that injects bullet glyphs */
 	}
 
 	/* "+N more" overflow: a cell shows up to 2 booking times inline plus a
 	 * "+N more" hint; the open popover reveals the rest and hides the hint, so
 	 * busy days keep a uniform cell height. */
-	.shootcal-availability__booking--overflow { display: none; }
-	.shootcal-availability__booking--more {
+	.shootcal-web-calendar__booking--overflow { display: none; }
+	.shootcal-web-calendar__booking--more {
 		opacity: 0.8;
 		font-weight: 600;
 	}
-	.shootcal-availability__day.is-open .shootcal-availability__booking--overflow { display: list-item; }
-	.shootcal-availability__day.is-open .shootcal-availability__booking--more { display: none; }
+	.shootcal-web-calendar__day.is-open .shootcal-web-calendar__booking--overflow { display: list-item; }
+	.shootcal-web-calendar__day.is-open .shootcal-web-calendar__booking--more { display: none; }
 
 	/* --- Click-to-expand popover (all viewports) ---
 	 *
@@ -516,12 +516,12 @@
 	/* Tappable affordance on cells with bookings. Hover/active states are
 	 * handled by the 0.8 -> 1.0 alpha shift above; cursor change is all the
 	 * extra hint that's needed. */
-	.shootcal-availability__day.is-limited {
+	.shootcal-web-calendar__day.is-limited {
 		cursor: pointer;
 	}
 
 	/* Let the popover tail extend past the card's rounded clip. */
-	.shootcal-availability__wrap { overflow: visible; }
+	.shootcal-web-calendar__wrap { overflow: visible; }
 
 	/* Because the wrap is overflow:visible (so the popover can escape), it can't
 	 * clip its children to the rounded corners the way overflow:hidden would.
@@ -530,11 +530,11 @@
 	 * making the corners look "cut off." Round their outer corners to match the
 	 * card so the corners stay clean. Inner radius = card radius minus the 1px
 	 * border so the child nests exactly inside the border's curve. */
-	.shootcal-availability__wrap > :first-child {
+	.shootcal-web-calendar__wrap > :first-child {
 		border-top-left-radius: calc(var(--shootcal-wrap-radius) - 1px);
 		border-top-right-radius: calc(var(--shootcal-wrap-radius) - 1px);
 	}
-	.shootcal-availability__wrap > :last-child {
+	.shootcal-web-calendar__wrap > :last-child {
 		border-bottom-left-radius: calc(var(--shootcal-wrap-radius) - 1px);
 		border-bottom-right-radius: calc(var(--shootcal-wrap-radius) - 1px);
 	}
@@ -544,7 +544,7 @@
 	 * be horizontally nudged at the calendar edges) so trying to "join" it to
 	 * the cell with matching radii doesn't align. The popover's own shadow +
 	 * the cell's color shift carry the visual association. */
-	.shootcal-availability__day.is-open {
+	.shootcal-web-calendar__day.is-open {
 		z-index: 25 !important;
 	}
 
@@ -558,7 +558,7 @@
 	 * under the cell; JS measures after opening and nudges the transform
 	 * horizontally if it would overflow the calendar card's edges. min-width:
 	 * 100% guarantees it never gets narrower than the cell on wide layouts. */
-	.shootcal-availability__day.is-open .shootcal-availability__bookings {
+	.shootcal-web-calendar__day.is-open .shootcal-web-calendar__bookings {
 		display: block !important;
 		position: absolute !important;
 		top: calc(100% + 4px) !important;  /* small gap so it reads as a floating card */
@@ -587,14 +587,14 @@
 	}
 	/* Booked state - keep the popover in the cell's color family even though
 	 * Booked cells aren't currently interactive. Future-proof. */
-	.shootcal-availability__day.is-booked.is-open .shootcal-availability__bookings {
+	.shootcal-web-calendar__day.is-booked.is-open .shootcal-web-calendar__bookings {
 		background-color: rgba( var(--shootcal-booked-bg-rgb), 1 );
 		color: var(--shootcal-booked-fg);
 	}
 
 	/* Flip the popover ABOVE the cell when JS detects last-row position.
 	 * Same standalone-card chrome, just inverted vertical direction. */
-	.shootcal-availability__day.is-open-above .shootcal-availability__bookings {
+	.shootcal-web-calendar__day.is-open-above .shootcal-web-calendar__bookings {
 		top: auto !important;
 		bottom: calc(100% + 4px) !important;
 		border-radius: 10px;
@@ -603,44 +603,44 @@
 	}
 
 	/* Each booking line breaks naturally - no truncation when popped open. */
-	.shootcal-availability__day.is-open .shootcal-availability__bookings li {
+	.shootcal-web-calendar__day.is-open .shootcal-web-calendar__bookings li {
 		white-space: normal;
 		overflow: visible;
 		text-overflow: clip;
 		opacity: 1;
 		margin: 0 0 0.3rem;
 	}
-	.shootcal-availability__day.is-open .shootcal-availability__bookings li:last-child {
+	.shootcal-web-calendar__day.is-open .shootcal-web-calendar__bookings li:last-child {
 		margin-bottom: 0;
 	}
 
 	/* --- Mobile sizing --- */
 	@media (max-width: 600px) {
-		.shootcal-availability__toolbar {
+		.shootcal-web-calendar__toolbar {
 			padding: 0.65rem;
 		}
-		.shootcal-availability__nav-label {
+		.shootcal-web-calendar__nav-label {
 			font-size: 1.1rem;
 		}
-		.shootcal-availability__day {
+		.shootcal-web-calendar__day {
 			min-height: 3.5rem;
 			padding: 0.3rem;
 		}
-		.shootcal-availability__date { font-size: 0.85rem; margin-bottom: 0.2rem; }
-		.shootcal-availability__weekday { font-size: 0.6rem; padding: 0.3rem 0; }
-		.shootcal-availability__status { font-size: 0.55rem; }
-		.shootcal-availability__btn { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
-		.shootcal-availability__btn--prev,
-		.shootcal-availability__btn--next { padding: 0.3rem 0.55rem; font-size: 1rem; }
+		.shootcal-web-calendar__date { font-size: 0.85rem; margin-bottom: 0.2rem; }
+		.shootcal-web-calendar__weekday { font-size: 0.6rem; padding: 0.3rem 0; }
+		.shootcal-web-calendar__status { font-size: 0.55rem; }
+		.shootcal-web-calendar__btn { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+		.shootcal-web-calendar__btn--prev,
+		.shootcal-web-calendar__btn--next { padding: 0.3rem 0.55rem; font-size: 1rem; }
 
 		/* On phones the inline bookings list would just be a single ellipsed
 		 * line - hide it. Users tap to see the full popover instead. */
-		.shootcal-availability__bookings { display: none; }
+		.shootcal-web-calendar__bookings { display: none; }
 
 		/* Since the times are hidden on phones, show a small dot on Limited days
 		 * so visitors know the cell is tappable for the booked times. (Booked days
 		 * keep their "BOOKED" label; Available days have nothing to show.) */
-		.shootcal-availability__day.is-limited::after {
+		.shootcal-web-calendar__day.is-limited::after {
 			content: '';
 			position: absolute;
 			left: 50%;
@@ -651,23 +651,23 @@
 			border-radius: 50%;
 			background: var(--shootcal-sunset);
 		}
-		.shootcal-availability__day.is-limited.is-open::after { display: none; }
+		.shootcal-web-calendar__day.is-limited.is-open::after { display: none; }
 
 		/* Tighter popover padding on phones. !important to beat the base
 		 * .__bookings padding rule (itself !important for theme defense). */
-		.shootcal-availability__day.is-open .shootcal-availability__bookings {
+		.shootcal-web-calendar__day.is-open .shootcal-web-calendar__bookings {
 			font-size: 0.72rem;
 			padding: 0.7rem 0.85rem !important;
 		}
 	}
 
 	/* --- No-JS fallback --- */
-	.no-js .shootcal-availability__month-panel,
-	.no-js .shootcal-availability__month-panel[hidden] {
+	.no-js .shootcal-web-calendar__month-panel,
+	.no-js .shootcal-web-calendar__month-panel[hidden] {
 		display: block !important;
 	}
-	.no-js .shootcal-availability__toolbar { display: none; }
-	.no-js .shootcal-availability__wrap--paginated .shootcal-availability__caption {
+	.no-js .shootcal-web-calendar__toolbar { display: none; }
+	.no-js .shootcal-web-calendar__wrap--paginated .shootcal-web-calendar__caption {
 		display: block;
 	}
 
@@ -679,7 +679,7 @@
 	 * rules win over normal layered declarations - so the box-model + list
 	 * properties here are pinned with !important, matching how the toolbar and
 	 * day cells defend themselves. Colors/typography stay overridable. */
-	.shootcal-availability__legend {
+	.shootcal-web-calendar__legend {
 		display: flex !important;
 		flex-wrap: wrap !important;
 		align-items: center;
@@ -693,7 +693,7 @@
 		font-size: 0.85rem;
 		color: var(--shootcal-muted);
 	}
-	.shootcal-availability__legend-item {
+	.shootcal-web-calendar__legend-item {
 		display: inline-flex !important;
 		align-items: center;
 		gap: 0.4rem;
@@ -702,9 +702,9 @@
 		list-style: none !important;
 	}
 	/* Defeat any theme rule that injects list bullets via ::before/::marker. */
-	.shootcal-availability__legend-item::before { content: none !important; }
-	.shootcal-availability__legend-item::marker { content: "" !important; }
-	.shootcal-availability__legend-swatch {
+	.shootcal-web-calendar__legend-item::before { content: none !important; }
+	.shootcal-web-calendar__legend-item::marker { content: "" !important; }
+	.shootcal-web-calendar__legend-swatch {
 		display: inline-block !important;
 		width: 1rem !important;
 		height: 1rem !important;
@@ -712,14 +712,14 @@
 		flex-shrink: 0;
 		box-sizing: border-box;
 	}
-	.shootcal-availability__legend-swatch--available {
+	.shootcal-web-calendar__legend-swatch--available {
 		background: var(--shootcal-available-bg);
 		box-shadow: inset 0 0 0 1px var(--shootcal-grid-line);
 	}
-	.shootcal-availability__legend-swatch--limited {
+	.shootcal-web-calendar__legend-swatch--limited {
 		background: rgba( var(--shootcal-limited-bg-rgb), 1 );
 	}
-	.shootcal-availability__legend-swatch--booked {
+	.shootcal-web-calendar__legend-swatch--booked {
 		background: rgba( var(--shootcal-booked-bg-rgb), 1 );
 	}
 
@@ -728,7 +728,7 @@
 	 * (unlayered) would otherwise win over the layered padding and the text
 	 * would run to the card's right edge. Pin the box-model + alignment with
 	 * !important; leave color/size overridable. */
-	.shootcal-availability__credit {
+	.shootcal-web-calendar__credit {
 		margin: 0 !important;
 		padding: 0.5rem 1rem 0.55rem !important;
 		font-size: 0.7rem;
@@ -741,19 +741,19 @@
 		background: var(--shootcal-out-bg);
 		box-sizing: border-box;
 	}
-	.shootcal-availability__credit a {
+	.shootcal-web-calendar__credit a {
 		color: inherit;
 		text-decoration: underline;
 		text-decoration-style: dotted;
 		text-underline-offset: 2px;
 	}
-	.shootcal-availability__credit a:hover,
-	.shootcal-availability__credit a:focus-visible {
+	.shootcal-web-calendar__credit a:hover,
+	.shootcal-web-calendar__credit a:focus-visible {
 		color: var(--shootcal-sunset);
 	}
 
 	/* Screen-reader only */
-	.shootcal-availability__sr-only {
+	.shootcal-web-calendar__sr-only {
 		position: absolute;
 		width: 1px;
 		height: 1px;
@@ -765,4 +765,50 @@
 		border: 0;
 	}
 
-} /* end @layer shootcal-availability */
+} /* end @layer shootcal-web-calendar */
+
+/* ----------------------------------------------------------------------------
+ * Full-calendar mode (mode="full") — list each event's time + title per day
+ * instead of free/busy shading. Activated by the --full container modifier.
+ * Cells carry no is-booked/is-limited/is-available class, so they keep the
+ * neutral "available" background; the event chips are a neutral gray.
+ * ------------------------------------------------------------------------- */
+.shootcal-web-calendar--full .shootcal-web-calendar__events {
+	grid-row: 2 / span 2 !important;
+	list-style: none !important;
+	margin: 0.1rem 0 0 !important;
+	padding: 0 !important;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	align-self: start;
+}
+.shootcal-web-calendar--full .shootcal-web-calendar__event {
+	list-style: none !important;
+	margin: 0 !important;
+	padding: 0.1rem 0.32rem !important;
+	background: rgba( 0, 0, 0, 0.05 );
+	border-radius: 5px;
+	font-size: 0.66rem;
+	line-height: 1.25;
+	color: var(--shootcal-label-fg);
+	overflow-wrap: anywhere;
+	text-indent: 0 !important;
+}
+.shootcal-web-calendar--full .shootcal-web-calendar__event::before { content: none !important; }
+.shootcal-web-calendar--full .shootcal-web-calendar__event-time {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	margin-right: 0.25rem;
+	white-space: nowrap;
+}
+.shootcal-web-calendar--full .shootcal-web-calendar__event-title {
+	color: var(--shootcal-muted);
+}
+.shootcal-web-calendar--full .shootcal-web-calendar__day.is-past .shootcal-web-calendar__events {
+	opacity: 0.55;
+}
+@media (max-width: 600px) {
+	.shootcal-web-calendar--full .shootcal-web-calendar__event { font-size: 0.58rem; padding: 0.06rem 0.22rem !important; }
+}

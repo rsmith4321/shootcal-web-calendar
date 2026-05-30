@@ -7,12 +7,12 @@
  * readers still navigate it as a 2D calendar regardless of how the visual
  * layout is rendered.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,7 +27,7 @@ class Month_Grid {
 	 * @param bool                      $multi_session_day Whether timed-only days are treated as "Limited" (true)
 	 *                                                  or rolled into "Booked" (false). Defaults to true.
 	 */
-	public function render( int $year, int $month, array $events_by_day, \DateTimeZone $tz, int $first_dow, bool $multi_session_day = true ): string {
+	public function render( int $year, int $month, array $events_by_day, \DateTimeZone $tz, int $first_dow, bool $multi_session_day = true, string $mode = 'availability' ): string {
 		$first_of_month = (new \DateTimeImmutable( 'now', $tz ))->setDate( $year, $month, 1 )->setTime( 0, 0, 0 );
 
 		// Today's date in the display timezone, used to mute past day cells.
@@ -40,13 +40,14 @@ class Month_Grid {
 		$month_label    = wp_date( 'F Y', $first_of_month->getTimestamp(), $tz );
 		$weekday_labels = $this->weekday_labels( $first_dow );
 
-		$html  = '<div class="shootcal-availability shootcal-availability--month" role="grid" aria-label="' . esc_attr( $month_label ) . '">';
-		$html .= '<div class="shootcal-availability__caption">' . esc_html( $month_label ) . '</div>';
+		$mode_class = ( 'full' === $mode ) ? ' shootcal-web-calendar--full' : '';
+		$html  = '<div class="shootcal-web-calendar shootcal-web-calendar--month' . $mode_class . '" role="grid" aria-label="' . esc_attr( $month_label ) . '">';
+		$html .= '<div class="shootcal-web-calendar__caption">' . esc_html( $month_label ) . '</div>';
 
 		// Weekday header row.
-		$html .= '<div class="shootcal-availability__week shootcal-availability__week--header" role="row">';
+		$html .= '<div class="shootcal-web-calendar__week shootcal-web-calendar__week--header" role="row">';
 		foreach ( $weekday_labels as $label ) {
-			$html .= '<div class="shootcal-availability__weekday" role="columnheader" abbr="' . esc_attr( $label['full'] ) . '"><abbr title="' . esc_attr( $label['full'] ) . '">' . esc_html( $label['short'] ) . '</abbr></div>';
+			$html .= '<div class="shootcal-web-calendar__weekday" role="columnheader" abbr="' . esc_attr( $label['full'] ) . '"><abbr title="' . esc_attr( $label['full'] ) . '">' . esc_html( $label['short'] ) . '</abbr></div>';
 		}
 		$html .= '</div>';
 
@@ -58,9 +59,9 @@ class Month_Grid {
 			for ( $dow = 0; $dow < 7; $dow++ ) {
 				$cell_day = $grid_start->modify( '+' . ( $week * 7 + $dow ) . ' days' );
 				$in_month = ( (int) $cell_day->format( 'n' ) === $month );
-				$row_html .= $this->render_cell( $cell_day, $events_by_day, $tz, $in_month, $today_local, $multi_session_day );
+				$row_html .= $this->render_cell( $cell_day, $events_by_day, $tz, $in_month, $today_local, $multi_session_day, $mode );
 			}
-			$html .= '<div class="shootcal-availability__week" role="row">' . $row_html . '</div>';
+			$html .= '<div class="shootcal-web-calendar__week" role="row">' . $row_html . '</div>';
 		}
 
 		$html .= '</div>';
@@ -88,7 +89,7 @@ class Month_Grid {
 	/**
 	 * @param array<string,Event[]> $events_by_day
 	 */
-	private function render_cell( \DateTimeImmutable $day, array $events_by_day, \DateTimeZone $tz, bool $in_month, \DateTimeImmutable $today_local, bool $multi_session_day = true ): string {
+	private function render_cell( \DateTimeImmutable $day, array $events_by_day, \DateTimeZone $tz, bool $in_month, \DateTimeImmutable $today_local, bool $multi_session_day = true, string $mode = 'availability' ): string {
 		$day_local = $day->setTimezone( $tz );
 		$day_num   = (int) $day_local->format( 'j' );
 		$iso_date  = $day_local->format( 'Y-m-d' );
@@ -96,6 +97,12 @@ class Month_Grid {
 		$is_today  = $day_local->setTime( 0, 0, 0 ) == $today_local;
 
 		$covering = $events_by_day[ $iso_date ] ?? array();
+
+		// Full-calendar mode lists each event's title + time instead of the
+		// availability status pill / busy shading.
+		if ( 'full' === $mode ) {
+			return $this->render_cell_full( $day_local, $iso_date, $day_num, $is_past, $is_today, $in_month, $covering, $tz );
+		}
 
 		// Detect the busy "shape" of the day:
 		//   has_full_day = at least one all-day event covers this day -> red, "Booked"
@@ -113,7 +120,7 @@ class Month_Grid {
 			}
 		}
 
-		$classes = array( 'shootcal-availability__day' );
+		$classes = array( 'shootcal-web-calendar__day' );
 
 		// Resolve final state. The "Limited" tier only applies when the photographer
 		// has opted in via the multi_session_day setting; otherwise any event
@@ -143,7 +150,7 @@ class Month_Grid {
 		$aria_label = wp_date( 'l, F j, Y', $day_local->getTimestamp(), $tz ) . ' - ' . $status_label;
 
 		$out  = '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="gridcell" aria-label="' . esc_attr( $aria_label ) . '">';
-		$out .= '<time class="shootcal-availability__date" datetime="' . esc_attr( $iso_date ) . '">' . esc_html( (string) $day_num ) . '</time>';
+		$out .= '<time class="shootcal-web-calendar__date" datetime="' . esc_attr( $iso_date ) . '">' . esc_html( (string) $day_num ) . '</time>';
 
 		// Status pill + booking times: shown on all non-past cells, regardless of
 		// whether the cell belongs to the visible month or is an out-of-month
@@ -152,7 +159,7 @@ class Month_Grid {
 		// date number to signal which month they actually belong to.
 		// Past cells stay quiet (no chip) - visitors care about future bookable days.
 		if ( ! $is_past ) {
-			$out .= '<span class="shootcal-availability__status">' . esc_html( $status_label ) . '</span>';
+			$out .= '<span class="shootcal-web-calendar__status">' . esc_html( $status_label ) . '</span>';
 
 			// On a "Limited" day (timed events only) we always render the booked
 			// time windows under the pill - "Booked 5-7 PM" - so visitors can
@@ -167,16 +174,16 @@ class Month_Grid {
 					}
 				}
 				$limit = 2; // show at most 2 inline; the rest sit behind "+N more"
-				$out  .= '<ul class="shootcal-availability__bookings">';
+				$out  .= '<ul class="shootcal-web-calendar__bookings">';
 				foreach ( $timed as $i => $event ) {
-					$overflow = ( $i >= $limit ) ? ' shootcal-availability__booking--overflow' : '';
-					$out     .= '<li class="shootcal-availability__booking' . $overflow . '">' . esc_html( $this->format_booking_window( $event, $day_local, $tz ) ) . '</li>';
+					$overflow = ( $i >= $limit ) ? ' shootcal-web-calendar__booking--overflow' : '';
+					$out     .= '<li class="shootcal-web-calendar__booking' . $overflow . '">' . esc_html( $this->format_booking_window( $event, $day_local, $tz ) ) . '</li>';
 				}
 				$extra = count( $timed ) - $limit;
 				if ( $extra > 0 ) {
-					$out .= '<li class="shootcal-availability__booking--more">' . esc_html(
+					$out .= '<li class="shootcal-web-calendar__booking--more">' . esc_html(
 						/* translators: %d: number of additional bookings hidden behind the "more" indicator. */
-						sprintf( _n( '+%d more', '+%d more', $extra, 'shootcal-availability' ), $extra )
+						sprintf( _n( '+%d more', '+%d more', $extra, 'shootcal-web-calendar' ), $extra )
 					) . '</li>';
 				}
 				$out .= '</ul>';
@@ -187,23 +194,96 @@ class Month_Grid {
 		return $out;
 	}
 
+	/**
+	 * Full-calendar cell: lists each event's title + time for the day. No
+	 * availability status/colors are applied (those are availability-mode
+	 * semantics). Past days still list their events - a sunrise/sunset style
+	 * calendar is informational, not a booking grid.
+	 *
+	 * @param Event[] $covering
+	 */
+	private function render_cell_full( \DateTimeImmutable $day_local, string $iso_date, int $day_num, bool $is_past, bool $is_today, bool $in_month, array $covering, \DateTimeZone $tz ): string {
+		$classes = array( 'shootcal-web-calendar__day' );
+		if ( $is_past ) {
+			$classes[] = 'is-past';
+		}
+		if ( $is_today ) {
+			$classes[] = 'is-today';
+		}
+		if ( ! $in_month ) {
+			$classes[] = 'is-out-of-month';
+		}
+		if ( ! empty( $covering ) ) {
+			$classes[] = 'has-events';
+		}
+
+		// Order a day's events by start time so e.g. Sunrise lists before Sunset.
+		usort(
+			$covering,
+			static fn( Event $a, Event $b ) => $a->start <=> $b->start
+		);
+
+		$count     = count( $covering );
+		$date_long = wp_date( 'l, F j, Y', $day_local->getTimestamp(), $tz );
+		$aria_label = ( $count > 0 )
+			/* translators: 1: long date, 2: number of events on that day. */
+			? sprintf( _n( '%1$s - %2$d event', '%1$s - %2$d events', $count, 'shootcal-web-calendar' ), $date_long, $count )
+			: $date_long;
+
+		$out  = '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="gridcell" aria-label="' . esc_attr( $aria_label ) . '">';
+		$out .= '<time class="shootcal-web-calendar__date" datetime="' . esc_attr( $iso_date ) . '">' . esc_html( (string) $day_num ) . '</time>';
+
+		if ( $count > 0 ) {
+			$out .= '<ul class="shootcal-web-calendar__events">';
+			foreach ( $covering as $event ) {
+				// format_event_label() escapes each dynamic part as it builds the span markup.
+				$out .= '<li class="shootcal-web-calendar__event">' . $this->format_event_label( $event, $tz ) . '</li>';
+			}
+			$out .= '</ul>';
+		}
+
+		$out .= '</div>';
+		return $out;
+	}
+
+	/**
+	 * Escaped label for one event in full mode: a time span (timed events) plus a
+	 * title span. All-day events show the title only, or "All day" when untitled.
+	 */
+	private function format_event_label( Event $event, \DateTimeZone $tz ): string {
+		$summary = ( null !== $event->summary ) ? trim( $event->summary ) : '';
+
+		if ( $event->all_day ) {
+			$title = ( '' !== $summary ) ? $summary : __( 'All day', 'shootcal-web-calendar' );
+			return '<span class="shootcal-web-calendar__event-title">' . esc_html( $title ) . '</span>';
+		}
+
+		$time_format = (string) get_option( 'time_format', 'g:i a' );
+		$start_local = $event->start->setTimezone( $tz );
+		$label       = '<span class="shootcal-web-calendar__event-time">' . esc_html( wp_date( $time_format, $start_local->getTimestamp(), $tz ) ) . '</span>';
+		if ( '' !== $summary ) {
+			$label .= '<span class="shootcal-web-calendar__event-title">' . esc_html( $summary ) . '</span>';
+		}
+		return $label;
+	}
+
 	private function status_label( string $key ): string {
 		switch ( $key ) {
 			case 'past':
-				return __( 'Past', 'shootcal-availability' );
+				return __( 'Past', 'shootcal-web-calendar' );
 			case 'booked':
-				return __( 'Booked', 'shootcal-availability' );
+				return __( 'Booked', 'shootcal-web-calendar' );
 			case 'limited':
-				return __( 'Limited', 'shootcal-availability' );
+				return __( 'Limited', 'shootcal-web-calendar' );
 			case 'available':
 			default:
-				return __( 'Available', 'shootcal-availability' );
+				return __( 'Available', 'shootcal-web-calendar' );
 		}
 	}
 
 	private function format_booking_window( Event $event, \DateTimeImmutable $day_local, \DateTimeZone $tz ): string {
 		if ( $event->all_day ) {
-			return __( 'Booked all day', 'shootcal-availability' );
+			return __( 'Booked all day', 'shootcal-web-calendar' );
 		}
 		$day_start = $day_local->setTime( 0, 0, 0 );
 		$day_end   = $day_start->modify( '+1 day' );
@@ -215,7 +295,7 @@ class Month_Grid {
 
 		/* translators: 1: booked window start time, 2: booked window end time. */
 		return sprintf(
-			__( 'Booked %1$s - %2$s', 'shootcal-availability' ),
+			__( 'Booked %1$s - %2$s', 'shootcal-web-calendar' ),
 			wp_date( $time_format, $start->getTimestamp(), $tz ),
 			wp_date( $time_format, $end->getTimestamp(), $tz )
 		);

@@ -2,12 +2,12 @@
 /**
  * Minimal event value object: a busy block in time.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,7 +16,10 @@ final class Event {
 	public function __construct(
 		public readonly \DateTimeImmutable $start,
 		public readonly \DateTimeImmutable $end,
-		public readonly bool $all_day
+		public readonly bool $all_day,
+		// Event title. Retained ONLY for full-calendar display mode; availability
+		// mode never reads it, preserving the title-free privacy default.
+		public readonly ?string $summary = null
 	) {}
 
 	/**

@@ -2,12 +2,12 @@
 /**
  * Fetches the iCal feed with WordPress transient caching.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,10 +18,13 @@ class Fetcher {
 	 *
 	 * @return string|\WP_Error iCal body on success, WP_Error on failure.
 	 */
-	public function get_ical_text() {
-		$url = Settings::get_active_url();
+	public function get_ical_text( string $url ) {
+		// The feed URL is supplied per embed (the shortcode `url` attribute or the
+		// block's Calendar feed URL field). Fetched via wp_safe_remote_get below,
+		// so an arbitrary URL can't be turned into SSRF; the cache key is per-URL.
+		$url = trim( $url );
 		if ( '' === $url ) {
-			return new \WP_Error( 'shootcal_availability_no_url', __( 'No calendar URL configured. Add an iCal URL on the settings page, or paste one into the block.', 'shootcal-availability' ) );
+			return new \WP_Error( 'shootcal_web_calendar_no_url', __( 'No calendar feed URL. Add a url to the shortcode or paste one into the block (use the generator under Settings to build the shortcode).', 'shootcal-web-calendar' ) );
 		}
 
 		$cache_key = self::cache_key( $url );
@@ -38,7 +41,7 @@ class Fetcher {
 			array(
 				'timeout'     => 10,
 				'redirection' => 3,
-				'user-agent'  => 'ShootCal Availability/' . VERSION . '; ' . home_url(),
+				'user-agent'  => 'ShootCal Web Calendar/' . VERSION . '; ' . home_url(),
 				'headers'     => array(
 					'Accept' => 'text/calendar, text/plain;q=0.9, */*;q=0.5',
 				),
@@ -52,10 +55,10 @@ class Fetcher {
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
 			return new \WP_Error(
-				'shootcal_availability_http_error',
+				'shootcal_web_calendar_http_error',
 				sprintf(
 					/* translators: %d: HTTP status code returned by Google. */
-					__( 'Calendar request failed with HTTP %d.', 'shootcal-availability' ),
+					__( 'Calendar request failed with HTTP %d.', 'shootcal-web-calendar' ),
 					$code
 				)
 			);
@@ -63,7 +66,7 @@ class Fetcher {
 
 		$body = (string) wp_remote_retrieve_body( $response );
 		if ( '' === $body || stripos( $body, 'BEGIN:VCALENDAR' ) === false ) {
-			return new \WP_Error( 'shootcal_availability_bad_body', __( 'Calendar response did not look like an iCal feed.', 'shootcal-availability' ) );
+			return new \WP_Error( 'shootcal_web_calendar_bad_body', __( 'Calendar response did not look like an iCal feed.', 'shootcal-web-calendar' ) );
 		}
 
 		set_transient( $cache_key, $body, CACHE_TTL );
@@ -76,7 +79,7 @@ class Fetcher {
 	 * and a settings change invalidate everything despite the per-URL keys.
 	 */
 	private static function cache_key( string $url ): string {
-		$ver = (int) get_option( 'shootcal_availability_cache_ver', 0 );
+		$ver = (int) get_option( 'shootcal_web_calendar_cache_ver', 0 );
 		return CACHE_KEY . '_' . $ver . '_' . md5( $url );
 	}
 
@@ -85,7 +88,7 @@ class Fetcher {
 	 * transients become unreachable and expire on their own TTL.
 	 */
 	public static function flush_cache(): void {
-		$ver = (int) get_option( 'shootcal_availability_cache_ver', 0 );
-		update_option( 'shootcal_availability_cache_ver', $ver + 1 );
+		$ver = (int) get_option( 'shootcal_web_calendar_cache_ver', 0 );
+		update_option( 'shootcal_web_calendar_cache_ver', $ver + 1 );
 	}
 }

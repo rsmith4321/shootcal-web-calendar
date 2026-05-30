@@ -1,4 +1,4 @@
-/* ShootCal Availability - paginated calendar navigation (Today / < / > / Month Year).
+/* ShootCal Web Calendar - paginated calendar navigation (Today / < / > / Month Year).
  *
  * Vanilla JS, no dependencies. All month panels are rendered server-side; this
  * script only changes which one is visible based on user input. With JS off,
@@ -16,7 +16,7 @@
 		wrap.dataset.shootcalActive = String( idx );
 
 		// Show only the matching panel.
-		var panels = wrap.querySelectorAll( '.shootcal-availability__month-panel' );
+		var panels = wrap.querySelectorAll( '.shootcal-web-calendar__month-panel' );
 		var monthName = '';
 		var monthYear = '';
 		var labelTextFallback = '';
@@ -43,7 +43,7 @@
 				label.textContent = ''; // clear
 				label.appendChild( document.createTextNode( monthName + ' ' ) );
 				var yearSpan = document.createElement( 'span' );
-				yearSpan.className = 'shootcal-availability__nav-year';
+				yearSpan.className = 'shootcal-web-calendar__nav-year';
 				yearSpan.textContent = monthYear;
 				label.appendChild( yearSpan );
 			} else if ( labelTextFallback ) {
@@ -52,9 +52,9 @@
 		}
 
 		// Enable/disable nav buttons at the boundaries + Today.
-		var prev = wrap.querySelector( '.shootcal-availability__btn--prev' );
-		var next = wrap.querySelector( '.shootcal-availability__btn--next' );
-		var todayBtn = wrap.querySelector( '.shootcal-availability__btn--today' );
+		var prev = wrap.querySelector( '.shootcal-web-calendar__btn--prev' );
+		var next = wrap.querySelector( '.shootcal-web-calendar__btn--next' );
+		var todayBtn = wrap.querySelector( '.shootcal-web-calendar__btn--today' );
 		if ( prev ) prev.disabled = idx <= 0;
 		if ( next ) next.disabled = idx >= total - 1;
 		if ( todayBtn ) {
@@ -66,10 +66,10 @@
 		// Close everything so it doesn't visually re-appear when they navigate
 		// back to that month. Also wipe inline edge-nudge transforms so the
 		// next open of that cell re-measures fresh.
-		wrap.querySelectorAll( '.shootcal-availability__day.is-open, .shootcal-availability__day.is-open-above' ).forEach( function ( c ) {
+		wrap.querySelectorAll( '.shootcal-web-calendar__day.is-open, .shootcal-web-calendar__day.is-open-above' ).forEach( function ( c ) {
 			c.classList.remove( 'is-open' );
 			c.classList.remove( 'is-open-above' );
-			var pop = c.querySelector( '.shootcal-availability__bookings' );
+			var pop = c.querySelector( '.shootcal-web-calendar__bookings' );
 			if ( pop ) pop.style.transform = '';
 		} );
 	}
@@ -77,7 +77,7 @@
 	document.addEventListener( 'click', function ( e ) {
 		var btn = e.target.closest && e.target.closest( '[data-shootcal-action]' );
 		if ( ! btn ) return;
-		var wrap = btn.closest( '.shootcal-availability__wrap--paginated' );
+		var wrap = btn.closest( '.shootcal-web-calendar__wrap--paginated' );
 		if ( ! wrap ) return;
 
 		var current = parseInt( wrap.dataset.shootcalActive, 10 ) || 0;
@@ -95,7 +95,7 @@
 
 	// Keyboard nav when focus is anywhere inside the calendar wrap.
 	document.addEventListener( 'keydown', function ( e ) {
-		var wrap = e.target.closest && e.target.closest( '.shootcal-availability__wrap--paginated' );
+		var wrap = e.target.closest && e.target.closest( '.shootcal-web-calendar__wrap--paginated' );
 		if ( ! wrap ) return;
 		// Don't hijack typing in form controls (currently none in our markup, but be polite).
 		if ( e.target.matches( 'input, textarea, select' ) ) return;
@@ -127,7 +127,7 @@
 	 * are interactive. Booked-all-day cells already say it all via the chip.
 	 */
 	function closeAllPopovers() {
-		document.querySelectorAll( '.shootcal-availability__day.is-open, .shootcal-availability__day.is-open-above' ).forEach( function ( c ) {
+		document.querySelectorAll( '.shootcal-web-calendar__day.is-open, .shootcal-web-calendar__day.is-open-above' ).forEach( function ( c ) {
 			c.classList.remove( 'is-open' );
 			c.classList.remove( 'is-open-above' );
 			clearPopoverHorizontal( c );
@@ -142,8 +142,8 @@
 	 * get a popover that aligns to the card edge instead of overflowing.
 	 */
 	function adjustPopoverHorizontal( cell ) {
-		var wrap = cell.closest( '.shootcal-availability__wrap' );
-		var popover = cell.querySelector( '.shootcal-availability__bookings' );
+		var wrap = cell.closest( '.shootcal-web-calendar__wrap' );
+		var popover = cell.querySelector( '.shootcal-web-calendar__bookings' );
 		if ( ! wrap || ! popover ) return;
 
 		// Reset any prior nudge so we measure the freshly-centered position.
@@ -164,12 +164,12 @@
 	}
 
 	function clearPopoverHorizontal( cell ) {
-		var popover = cell.querySelector( '.shootcal-availability__bookings' );
+		var popover = cell.querySelector( '.shootcal-web-calendar__bookings' );
 		if ( popover ) popover.style.transform = '';
 	}
 
 	document.addEventListener( 'click', function ( e ) {
-		var cell = e.target.closest && e.target.closest( '.shootcal-availability__day' );
+		var cell = e.target.closest && e.target.closest( '.shootcal-web-calendar__day' );
 
 		// Tap outside any cell - close everything.
 		if ( ! cell ) {
@@ -178,7 +178,7 @@
 		}
 
 		// Different cell tapped - close any previous before considering this one.
-		var openCell = document.querySelector( '.shootcal-availability__day.is-open' );
+		var openCell = document.querySelector( '.shootcal-web-calendar__day.is-open' );
 		if ( openCell && openCell !== cell ) {
 			openCell.classList.remove( 'is-open' );
 			openCell.classList.remove( 'is-open-above' );
@@ -187,7 +187,7 @@
 
 		// Only Limited cells with bookings are interactive.
 		if ( cell.classList.contains( 'is-limited' ) ) {
-			if ( cell.querySelector( '.shootcal-availability__bookings' ) ) {
+			if ( cell.querySelector( '.shootcal-web-calendar__bookings' ) ) {
 				var willOpen = ! cell.classList.contains( 'is-open' );
 				cell.classList.toggle( 'is-open' );
 				if ( willOpen ) {
@@ -219,16 +219,20 @@
 	 * cache doesn't store) and swap it in. The delegated click/keydown handlers
 	 * above then work on the injected markup without any re-binding. */
 	function hydrateLazy() {
-		if ( typeof window.ShootCalAvailabilityFront === 'undefined' ) return;
-		var boxes = document.querySelectorAll( '.shootcal-availability__lazy[data-shootcal-lazy]' );
+		if ( typeof window.ShootCalWebCalendarFront === 'undefined' ) return;
+		var boxes = document.querySelectorAll( '.shootcal-web-calendar__lazy[data-shootcal-lazy]' );
 		boxes.forEach( function ( box ) {
 			var body = new URLSearchParams();
-			body.set( 'action', 'shootcal_availability_render' );
+			body.set( 'action', 'shootcal_web_calendar_render' );
+			if ( box.dataset.shootcalUrl ) body.set( 'url', box.dataset.shootcalUrl );
+			if ( box.dataset.shootcalMode ) body.set( 'mode', box.dataset.shootcalMode );
 			if ( box.dataset.shootcalMonths ) body.set( 'months', box.dataset.shootcalMonths );
 			if ( typeof box.dataset.shootcalFirstDay !== 'undefined' ) body.set( 'first_day', box.dataset.shootcalFirstDay );
 			if ( box.dataset.shootcalTimezone ) body.set( 'timezone', box.dataset.shootcalTimezone );
+			if ( box.dataset.shootcalMsd ) body.set( 'msd', box.dataset.shootcalMsd );
+			if ( box.dataset.shootcalSig ) body.set( 'sig', box.dataset.shootcalSig );
 
-			fetch( window.ShootCalAvailabilityFront.ajaxUrl, {
+			fetch( window.ShootCalWebCalendarFront.ajaxUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 				body: body.toString(),

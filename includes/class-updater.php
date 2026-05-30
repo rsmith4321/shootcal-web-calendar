@@ -20,23 +20,23 @@
  * The download_url we hand WP is the ZIP ASSET attached to the release
  * (not GitHub's auto-generated "Source code" ZIP, which unpacks into a
  * tag-named folder and breaks the plugin path). The release workflow
- * always attaches a `shootcal-availability-X.Y.Z.zip` built with the
+ * always attaches a `shootcal-web-calendar-X.Y.Z.zip` built with the
  * correct top-level folder.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
 class Updater {
 
 	private const GITHUB_OWNER = 'rsmith4321';
-	private const GITHUB_REPO  = 'shootcal-availability';
-	private const CACHE_KEY    = 'shootcal_availability_github_release';
+	private const GITHUB_REPO  = 'shootcal-web-calendar';
+	private const CACHE_KEY    = 'shootcal_web_calendar_github_release';
 	private const CACHE_TTL    = 12 * HOUR_IN_SECONDS;
 	private const ERROR_TTL    = HOUR_IN_SECONDS; // shorter cache when a fetch fails
 	private const USER_AGENT   = 'ShootCal-Availability-WP-Plugin';
@@ -52,17 +52,17 @@ class Updater {
 	 * Served via raw.githubusercontent.com, which sends image/png with
 	 * cacheable headers - WP fetches each icon once and caches it.
 	 */
-	private const ICON_URL_1X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-availability/main/.wordpress-org/icon-128x128.png';
-	private const ICON_URL_2X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-availability/main/.wordpress-org/icon-256x256.png';
+	private const ICON_URL_1X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-web-calendar/main/.wordpress-org/icon-128x128.png';
+	private const ICON_URL_2X = 'https://raw.githubusercontent.com/rsmith4321/shootcal-web-calendar/main/.wordpress-org/icon-256x256.png';
 
 	private string $plugin_basename;
 	private string $plugin_slug;
 	private string $current_version;
 
 	public function __construct() {
-		// e.g. "shootcal-availability/shootcal-availability.php"
+		// e.g. "shootcal-web-calendar/shootcal-web-calendar.php"
 		$this->plugin_basename = plugin_basename( PLUGIN_FILE );
-		// e.g. "shootcal-availability"
+		// e.g. "shootcal-web-calendar"
 		$this->plugin_slug     = dirname( $this->plugin_basename );
 		$this->current_version = VERSION;
 	}
@@ -153,14 +153,14 @@ class Updater {
 		}
 
 		return (object) array(
-			'name'              => 'ShootCal Availability',
+			'name'              => 'ShootCal Web Calendar',
 			'slug'              => $this->plugin_slug,
 			'version'           => $release['version'],
 			'author'            => '<a href="https://shootcal.app">Ryan Smith</a>',
 			'homepage'          => 'https://github.com/' . self::GITHUB_OWNER . '/' . self::GITHUB_REPO,
-			'short_description' => __( 'Show your photography availability on WordPress as a month grid.', 'shootcal-availability' ),
+			'short_description' => __( 'Show your photography availability on WordPress as a month grid.', 'shootcal-web-calendar' ),
 			'sections'          => array(
-				'description' => __( 'Show your photography availability on WordPress as a month grid. Reads a private iCal URL or ShootCal feed URL server-side and exposes busy days without revealing event details.', 'shootcal-availability' ),
+				'description' => __( 'Show your photography availability on WordPress as a month grid. Reads a private iCal URL or ShootCal feed URL server-side and exposes busy days without revealing event details.', 'shootcal-web-calendar' ),
 				'changelog'   => '<pre style="white-space:pre-wrap">' . esc_html( $release['notes'] ) . '</pre>',
 			),
 			'download_link'     => $release['download_url'],

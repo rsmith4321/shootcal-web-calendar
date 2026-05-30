@@ -2,12 +2,12 @@
 /**
  * Conditional asset loading for the shortcode.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,13 +20,13 @@ class Assets {
 
 	public function register_frontend(): void {
 		wp_register_style(
-			'shootcal-availability',
+			'shootcal-web-calendar',
 			PLUGIN_URL . 'assets/css/frontend.css',
 			array(),
 			VERSION
 		);
 		wp_register_script(
-			'shootcal-availability',
+			'shootcal-web-calendar',
 			PLUGIN_URL . 'assets/js/frontend.js',
 			array(),
 			VERSION,
@@ -36,8 +36,8 @@ class Assets {
 		// from admin-ajax after the cached page loads. Harmless when that mode is
 		// off (no placeholder exists for the script to hydrate).
 		wp_localize_script(
-			'shootcal-availability',
-			'ShootCalAvailabilityFront',
+			'shootcal-web-calendar',
+			'ShootCalWebCalendarFront',
 			array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ) )
 		);
 	}
@@ -50,8 +50,8 @@ class Assets {
 	 */
 	public function maybe_enqueue_for_content( $content ) {
 		if ( is_string( $content ) && has_shortcode( $content, Shortcode::TAG ) ) {
-			wp_enqueue_style( 'shootcal-availability' );
-			wp_enqueue_script( 'shootcal-availability' );
+			wp_enqueue_style( 'shootcal-web-calendar' );
+			wp_enqueue_script( 'shootcal-web-calendar' );
 		}
 		return $content;
 	}

@@ -1,24 +1,24 @@
 <?php
 /**
- * [shootcal_availability] shortcode.
+ * [shootcal_web_calendar] shortcode.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
 class Shortcode {
 
-	public const TAG = 'shootcal_availability';
+	public const TAG = 'shootcal_web_calendar';
 
 	public function register(): void {
 		add_shortcode( self::TAG, array( $this, 'render' ) );
-		add_action( 'wp_ajax_shootcal_availability_render', array( $this, 'handle_ajax_render' ) );
-		add_action( 'wp_ajax_nopriv_shootcal_availability_render', array( $this, 'handle_ajax_render' ) );
+		add_action( 'wp_ajax_shootcal_web_calendar_render', array( $this, 'handle_ajax_render' ) );
+		add_action( 'wp_ajax_nopriv_shootcal_web_calendar_render', array( $this, 'handle_ajax_render' ) );
 	}
 
 	/**
@@ -29,65 +29,101 @@ class Shortcode {
 	 * @param array<string,string>|string $atts
 	 */
 	public function render( $atts = array() ): string {
+		$atts = is_array( $atts ) ? $atts : array();
+		// "Page caching" mode: emit a lightweight placeholder that JS hydrates from
+		// admin-ajax, so the page stays fully cacheable while the calendar renders
+		// fresh behind a full-page cache (e.g. Varnish). The placeholder carries the
+		// per-embed URL plus an HMAC signature (see render_lazy_placeholder) so the
+		// public AJAX endpoint only renders URLs the plugin itself emitted - never an
+		// arbitrary attacker-supplied one.
 		if ( ! empty( Settings::get_options()['ajax_render'] ) ) {
-			return $this->render_lazy_placeholder( is_array( $atts ) ? $atts : array() );
+			return $this->render_lazy_placeholder( $atts );
 		}
 		return $this->render_calendar( $atts );
 	}
 
 	/**
-	 * Placeholder emitted in AJAX mode. Carries only non-sensitive display
-	 * overrides (months / first day / timezone) as data attributes - the
-	 * calendar URL is never exposed to the page; the AJAX endpoint reads it from
-	 * settings server-side.
+	 * HMAC over the embed parameters, keyed on the site's auth salt. The lazy
+	 * placeholder emits this alongside the params; the public AJAX endpoint
+	 * recomputes and compares it, so it will only ever render a URL the plugin
+	 * itself placed on a page - not an arbitrary attacker-supplied one.
+	 */
+	private static function signature( string $url, string $mode, string $months, string $first_day, string $timezone, string $msd ): string {
+		return hash_hmac( 'sha256', implode( "\n", array( $url, $mode, $months, $first_day, $timezone, $msd ) ), wp_salt( 'auth' ) );
+	}
+
+	/**
+	 * Placeholder emitted in "Page caching" mode. Carries the embed's feed URL +
+	 * display options as data attributes, plus an HMAC signature so the AJAX
+	 * endpoint can trust the URL (see signature()). JS swaps in the real calendar
+	 * after the (cacheable) page loads.
 	 *
 	 * @param array<string,string> $atts
 	 */
 	private function render_lazy_placeholder( array $atts ): string {
-		$data = '';
-		if ( isset( $atts['months'] ) && (int) $atts['months'] > 0 ) {
-			$data .= ' data-shootcal-months="' . esc_attr( (string) (int) $atts['months'] ) . '"';
+		$opts      = Settings::get_options();
+		$url       = esc_url_raw( trim( html_entity_decode( (string) ( $atts['url'] ?? '' ), ENT_QUOTES ) ) );
+		$mode      = ( isset( $atts['mode'] ) && 'full' === strtolower( (string) $atts['mode'] ) ) ? 'full' : 'availability';
+		$months    = ( isset( $atts['months'] ) && (int) $atts['months'] > 0 ) ? (string) (int) $atts['months'] : '';
+		$first_day = ( isset( $atts['first_day'] ) && '1' === (string) $atts['first_day'] ) ? '1' : (string) (int) $opts['first_day_of_week'];
+		$timezone  = ! empty( $atts['timezone'] ) ? (string) $atts['timezone'] : '';
+		$msd       = ( isset( $atts['multi_session_day'] ) && '0' === (string) $atts['multi_session_day'] ) ? '0' : '1';
+		$sig       = self::signature( $url, $mode, $months, $first_day, $timezone, $msd );
+
+		$data  = ' data-shootcal-url="' . esc_attr( $url ) . '"';
+		$data .= ' data-shootcal-mode="' . esc_attr( $mode ) . '"';
+		if ( '' !== $months ) {
+			$data .= ' data-shootcal-months="' . esc_attr( $months ) . '"';
 		}
-		if ( isset( $atts['first_day'] ) ) {
-			$data .= ' data-shootcal-first-day="' . esc_attr( ( '1' === (string) $atts['first_day'] ) ? '1' : '0' ) . '"';
+		$data .= ' data-shootcal-first-day="' . esc_attr( $first_day ) . '"';
+		if ( '' !== $timezone ) {
+			$data .= ' data-shootcal-timezone="' . esc_attr( $timezone ) . '"';
 		}
-		if ( ! empty( $atts['timezone'] ) ) {
-			$data .= ' data-shootcal-timezone="' . esc_attr( (string) $atts['timezone'] ) . '"';
-		}
-		return '<div class="shootcal-availability__wrap shootcal-availability__lazy" data-shootcal-lazy' . $data . '>'
-			. '<p class="shootcal-availability__lazy-msg">' . esc_html__( 'Loading availability…', 'shootcal-availability' ) . '</p>'
+		$data .= ' data-shootcal-msd="' . esc_attr( $msd ) . '"';
+		$data .= ' data-shootcal-sig="' . esc_attr( $sig ) . '"';
+
+		return '<div class="shootcal-web-calendar__wrap shootcal-web-calendar__lazy" data-shootcal-lazy' . $data . '>'
+			. '<p class="shootcal-web-calendar__lazy-msg">' . esc_html__( 'Loading calendar…', 'shootcal-web-calendar' ) . '</p>'
 			. '</div>';
 	}
 
 	/**
 	 * AJAX endpoint: render the calendar fresh, bypassing full-page caches.
-	 * Public (logged-in + logged-out), read-only. Only bounded display params
-	 * are accepted; the calendar URL always comes from settings, so this cannot
-	 * be used to fetch an arbitrary URL.
+	 * Public (logged-in + logged-out), read-only. The URL + options must carry a
+	 * valid HMAC signature (see signature()), so this endpoint can only render an
+	 * embed the plugin itself emitted - never an arbitrary attacker URL. The fetch
+	 * still goes through wp_safe_remote_get, which blocks internal/SSRF targets.
 	 */
 	public function handle_ajax_render(): void {
-		$atts = array();
-		// phpcs:disable WordPress.Security.NonceVerification.Missing -- public read-only render; no state change and no nonce to verify.
-		if ( isset( $_POST['months'] ) ) {
-			$months = (int) $_POST['months'];
-			if ( $months > 0 ) {
-				$atts['months'] = (string) min( 36, $months );
-			}
-		}
-		if ( isset( $_POST['first_day'] ) ) {
-			$atts['first_day'] = ( '1' === (string) $_POST['first_day'] ) ? '1' : '0';
-		}
-		if ( isset( $_POST['timezone'] ) ) {
-			$tz = sanitize_text_field( wp_unslash( (string) $_POST['timezone'] ) );
-			// Only accept a real IANA zone. This bounds the render-cache key to the
-			// finite set of valid zone names, so a public (nopriv) caller can't
-			// flood the transient store with unique arbitrary strings (WP-2). An
-			// invalid value is dropped and the site default applies, as before.
-			if ( '' !== $tz && in_array( $tz, timezone_identifiers_list(), true ) ) {
-				$atts['timezone'] = $tz;
-			}
-		}
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- authenticated by the HMAC signature below, not a nonce.
+		$url       = isset( $_POST['url'] ) ? trim( (string) wp_unslash( $_POST['url'] ) ) : '';
+		$mode      = ( isset( $_POST['mode'] ) && 'full' === $_POST['mode'] ) ? 'full' : 'availability';
+		$months    = ( isset( $_POST['months'] ) && (int) $_POST['months'] > 0 ) ? (string) min( 36, (int) $_POST['months'] ) : '';
+		$first_day = ( isset( $_POST['first_day'] ) && '1' === (string) $_POST['first_day'] ) ? '1' : '0';
+		$timezone  = isset( $_POST['timezone'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['timezone'] ) ) : '';
+		$msd       = ( isset( $_POST['msd'] ) && '0' === (string) $_POST['msd'] ) ? '0' : '1';
+		$sig       = isset( $_POST['sig'] ) ? (string) wp_unslash( $_POST['sig'] ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		$expected = self::signature( $url, $mode, $months, $first_day, $timezone, $msd );
+		if ( '' === $url || ! hash_equals( $expected, $sig ) ) {
+			status_header( 400 );
+			wp_die( '', '', array( 'response' => 400 ) );
+		}
+
+		$atts = array(
+			'url'               => $url,
+			'mode'              => $mode,
+			'first_day'         => $first_day,
+			'multi_session_day' => $msd,
+		);
+		if ( '' !== $months ) {
+			$atts['months'] = $months;
+		}
+		if ( '' !== $timezone ) {
+			$atts['timezone'] = $timezone;
+		}
+
 		nocache_headers();
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_calendar() escapes all dynamic values as it builds the markup.
 		echo $this->render_calendar( $atts );
@@ -111,20 +147,35 @@ class Shortcode {
 				// over the saved settings value. Only an explicit timezone="..."
 				// attribute counts as a manual override.
 				'timezone'    => '',
+				// Display mode: "availability" (free/busy shading, default) or
+				// "full" (show each event's title + time).
+				'mode'        => 'availability',
+				// Per-embed feed URL (required to render anything).
+				'url'         => '',
+				// Availability-mode only: "1" = a day with only timed events shows
+				// as "Limited" (room for another client at a different time); "0" =
+				// any event marks the whole day "Booked". Only meaningful for an
+				// availability feed, so it lives per-embed, not site-wide.
+				'multi_session_day' => '1',
 			),
 			is_array( $atts ) ? $atts : array(),
 			self::TAG
 		);
 
-		// The calendar URL is configured once in Settings; the source (ShootCal
-		// vs generic iCal) is detected from that URL's host.
-		$source = $this->source_for_url( Settings::get_active_url() );
+		// Feed URL comes from the per-embed `url` attribute (shortcode or block).
+		// The source (ShootCal vs generic iCal) is detected from the URL's host.
+		$mode       = ( 'full' === strtolower( (string) $atts['mode'] ) ) ? 'full' : 'availability';
+		// Decode entities the editor may inject into a shortcode attribute (e.g.
+		// & -> &amp; inside a query string) before sanitizing, so multi-parameter
+		// feed URLs survive. Block attributes are stored clean and unaffected.
+		$active_url = esc_url_raw( trim( html_entity_decode( (string) $atts['url'], ENT_QUOTES ) ) );
+		$source     = $this->source_for_url( $active_url );
 
 		$attr_months  = (int) $atts['months']; // 0 if empty / not provided
 		$first_dow    = ( 1 === (int) $atts['first_day'] ) ? 1 : 0;
 
 		$fetcher = new Fetcher();
-		$ical    = $fetcher->get_ical_text();
+		$ical    = $fetcher->get_ical_text( $active_url );
 		if ( is_wp_error( $ical ) ) {
 			return $this->render_admin_notice( $ical->get_error_message() );
 		}
@@ -159,7 +210,7 @@ class Shortcode {
 			implode(
 				'|',
 				array(
-					(string) get_option( 'shootcal_availability_cache_ver', 0 ),
+					(string) get_option( 'shootcal_web_calendar_cache_ver', 0 ),
 					$tz->getName(),
 					$today_render_date,
 					$source,
@@ -216,7 +267,8 @@ class Shortcode {
 
 		$grid                  = new Month_Grid();
 		$cursor                = $window_start;
-		$multi_session_day     = ! empty( $opts['multi_session_day'] );
+		// Per-embed: only "0" disables the Limited tier; anything else (default "1") keeps it.
+		$multi_session_day     = ( '0' !== (string) $atts['multi_session_day'] );
 
 		// Render each month as its own panel. Build a flat list - we will hide
 		// all but one and let the toolbar's prev/next/today nav switch between them.
@@ -241,7 +293,7 @@ class Shortcode {
 				'label'       => $label,
 				'label_month' => $label_month,
 				'label_year'  => $label_year,
-				'html'        => $grid->render( $y, $m, $events_by_day, $tz, $first_dow, $multi_session_day ),
+				'html'        => $grid->render( $y, $m, $events_by_day, $tz, $first_dow, $multi_session_day, $mode ),
 			);
 
 			if ( $y === $today_y && $m === $today_m ) {
@@ -252,12 +304,15 @@ class Shortcode {
 			$cursor = $cursor->modify( '+1 month' );
 		}
 
-		$credit       = $this->legend_html( $multi_session_day ) . $this->credit_html( $source );
+		// The availability legend (Available / Limited / Booked) only applies in
+		// availability mode; full mode just lists events, so skip it there.
+		$legend       = ( 'full' === $mode ) ? '' : $this->legend_html( $multi_session_day );
+		$credit       = $legend . $this->credit_html( $source );
 		$inline_style = $this->color_override_style( $opts );
 
 		// Single month: skip the toolbar - nothing to navigate.
 		if ( count( $panels ) === 1 ) {
-			$html = $inline_style . '<div class="shootcal-availability__wrap">' . $panels[0]['html'] . $credit . '</div>';
+			$html = $inline_style . '<div class="shootcal-web-calendar__wrap">' . $panels[0]['html'] . $credit . '</div>';
 		} else {
 			$html = $inline_style . $this->render_paginated( $panels, $active_idx, $today_idx, $credit );
 		}
@@ -286,7 +341,7 @@ class Shortcode {
 		}
 
 		return sprintf(
-			'<style>.shootcal-availability__wrap{--shootcal-limited-bg-rgb:%s;--shootcal-booked-bg-rgb:%s;}</style>',
+			'<style>.shootcal-web-calendar__wrap{--shootcal-limited-bg-rgb:%s;--shootcal-booked-bg-rgb:%s;}</style>',
 			esc_attr( $limited_rgb ),
 			esc_attr( $booked_rgb )
 		);
@@ -319,33 +374,33 @@ class Shortcode {
 		$first_label = $panels[0]['label'];
 		$last_label  = $panels[ $total - 1 ]['label'];
 
-		$html  = '<div class="shootcal-availability__wrap shootcal-availability__wrap--paginated" data-shootcal-total="' . (int) $total . '" data-shootcal-today="' . (int) $today_idx . '" data-shootcal-active="' . (int) $active_idx . '">';
+		$html  = '<div class="shootcal-web-calendar__wrap shootcal-web-calendar__wrap--paginated" data-shootcal-total="' . (int) $total . '" data-shootcal-today="' . (int) $today_idx . '" data-shootcal-active="' . (int) $active_idx . '">';
 
 		// Toolbar - month label on the left, navigation group (< Today >) on the right.
-		$html .= '<div class="shootcal-availability__toolbar" role="group" aria-label="' . esc_attr__( 'Calendar navigation', 'shootcal-availability' ) . '">';
+		$html .= '<div class="shootcal-web-calendar__toolbar" role="group" aria-label="' . esc_attr__( 'Calendar navigation', 'shootcal-web-calendar' ) . '">';
 
 		$html .= sprintf(
-			'<h2 class="shootcal-availability__nav-label" aria-live="polite" data-shootcal-month-label>%s <span class="shootcal-availability__nav-year">%s</span></h2>',
+			'<h2 class="shootcal-web-calendar__nav-label" aria-live="polite" data-shootcal-month-label>%s <span class="shootcal-web-calendar__nav-year">%s</span></h2>',
 			esc_html( $panels[ $active_idx ]['label_month'] ),
 			esc_html( $panels[ $active_idx ]['label_year'] )
 		);
 
-		$html .= '<div class="shootcal-availability__nav">';
+		$html .= '<div class="shootcal-web-calendar__nav">';
 		$html .= sprintf(
-			'<button type="button" class="shootcal-availability__btn shootcal-availability__btn--prev" data-shootcal-action="prev" aria-label="%s"%s>%s</button>',
-			esc_attr__( 'Previous month', 'shootcal-availability' ),
+			'<button type="button" class="shootcal-web-calendar__btn shootcal-web-calendar__btn--prev" data-shootcal-action="prev" aria-label="%s"%s>%s</button>',
+			esc_attr__( 'Previous month', 'shootcal-web-calendar' ),
 			$active_idx === 0 ? ' disabled' : '',
 			'&lsaquo;'
 		);
 		$today_disabled = ( $today_idx === -1 || $today_idx === $active_idx );
 		$html .= sprintf(
-			'<button type="button" class="shootcal-availability__btn shootcal-availability__btn--today" data-shootcal-action="today"%s>%s</button>',
+			'<button type="button" class="shootcal-web-calendar__btn shootcal-web-calendar__btn--today" data-shootcal-action="today"%s>%s</button>',
 			$today_disabled ? ' disabled' : '',
-			esc_html__( 'Today', 'shootcal-availability' )
+			esc_html__( 'Today', 'shootcal-web-calendar' )
 		);
 		$html .= sprintf(
-			'<button type="button" class="shootcal-availability__btn shootcal-availability__btn--next" data-shootcal-action="next" aria-label="%s"%s>%s</button>',
-			esc_attr__( 'Next month', 'shootcal-availability' ),
+			'<button type="button" class="shootcal-web-calendar__btn shootcal-web-calendar__btn--next" data-shootcal-action="next" aria-label="%s"%s>%s</button>',
+			esc_attr__( 'Next month', 'shootcal-web-calendar' ),
 			$active_idx === $total - 1 ? ' disabled' : '',
 			'&rsaquo;'
 		);
@@ -354,11 +409,11 @@ class Shortcode {
 		$html .= '</div>'; // toolbar
 
 		// Viewport - all month panels rendered, only the active one visible.
-		$html .= '<div class="shootcal-availability__viewport">';
+		$html .= '<div class="shootcal-web-calendar__viewport">';
 		foreach ( $panels as $p ) {
 			$is_active = ( $p['idx'] === $active_idx );
 			$html     .= sprintf(
-				'<div class="shootcal-availability__month-panel%s" data-shootcal-month-idx="%d" data-shootcal-month-label="%s" data-shootcal-month-name="%s" data-shootcal-month-year="%s"%s>%s</div>',
+				'<div class="shootcal-web-calendar__month-panel%s" data-shootcal-month-idx="%d" data-shootcal-month-label="%s" data-shootcal-month-name="%s" data-shootcal-month-year="%s"%s>%s</div>',
 				$is_active ? ' is-active' : '',
 				$p['idx'],
 				esc_attr( $p['label'] ),
@@ -371,9 +426,9 @@ class Shortcode {
 		$html .= '</div>';
 
 		// Screen-reader only context about the available range.
-		$html .= '<p class="shootcal-availability__sr-only">' . sprintf(
+		$html .= '<p class="shootcal-web-calendar__sr-only">' . sprintf(
 			/* translators: 1: earliest visible month, 2: latest visible month. */
-			esc_html__( 'Available months: %1$s through %2$s.', 'shootcal-availability' ),
+			esc_html__( 'Available months: %1$s through %2$s.', 'shootcal-web-calendar' ),
 			esc_html( $first_label ),
 			esc_html( $last_label )
 		) . '</p>';
@@ -395,16 +450,16 @@ class Shortcode {
 	 * has turned off multi-session days (then there is no Limited state).
 	 */
 	private function legend_html( bool $multi_session_day ): string {
-		$items = array( array( 'available', __( 'Available', 'shootcal-availability' ) ) );
+		$items = array( array( 'available', __( 'Available', 'shootcal-web-calendar' ) ) );
 		if ( $multi_session_day ) {
-			$items[] = array( 'limited', __( 'Limited', 'shootcal-availability' ) );
+			$items[] = array( 'limited', __( 'Limited', 'shootcal-web-calendar' ) );
 		}
-		$items[] = array( 'booked', __( 'Booked', 'shootcal-availability' ) );
+		$items[] = array( 'booked', __( 'Booked', 'shootcal-web-calendar' ) );
 
-		$out = '<ul class="shootcal-availability__legend">';
+		$out = '<ul class="shootcal-web-calendar__legend">';
 		foreach ( $items as $item ) {
-			$out .= '<li class="shootcal-availability__legend-item">'
-				. '<span class="shootcal-availability__legend-swatch shootcal-availability__legend-swatch--' . esc_attr( $item[0] ) . '" aria-hidden="true"></span>'
+			$out .= '<li class="shootcal-web-calendar__legend-item">'
+				. '<span class="shootcal-web-calendar__legend-swatch shootcal-web-calendar__legend-swatch--' . esc_attr( $item[0] ) . '" aria-hidden="true"></span>'
 				. esc_html( $item[1] )
 				. '</li>';
 		}
@@ -418,11 +473,11 @@ class Shortcode {
 		$link = sprintf(
 			'<a href="%s" target="_blank" rel="noopener">%s</a>',
 			esc_url( 'https://www.ryansmithphotography.com/photography-apps/shootcal/' ),
-			esc_html__( 'ShootCal', 'shootcal-availability' )
+			esc_html__( 'ShootCal', 'shootcal-web-calendar' )
 		);
-		return '<p class="shootcal-availability__credit">' . sprintf(
+		return '<p class="shootcal-web-calendar__credit">' . sprintf(
 			/* translators: %s: linked plugin name. */
-			esc_html__( 'Calendar provided by %s by Ryan Smith Photography', 'shootcal-availability' ),
+			esc_html__( 'Calendar provided by %s by Ryan Smith Photography', 'shootcal-web-calendar' ),
 			$link // already escaped above
 		) . '</p>';
 	}
@@ -544,8 +599,8 @@ class Shortcode {
 			return '';
 		}
 		return sprintf(
-			'<div class="shootcal-availability__error" style="border:1px solid #c00; padding:.75em 1em; background:#fff5f5;"><strong>%s</strong> %s</div>',
-			esc_html__( 'ShootCal Availability:', 'shootcal-availability' ),
+			'<div class="shootcal-web-calendar__error" style="border:1px solid #c00; padding:.75em 1em; background:#fff5f5;"><strong>%s</strong> %s</div>',
+			esc_html__( 'ShootCal Web Calendar:', 'shootcal-web-calendar' ),
 			esc_html( $message )
 		);
 	}

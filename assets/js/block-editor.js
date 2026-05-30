@@ -1,6 +1,6 @@
-/* ShootCal Availability - block editor script (vanilla JS, no build).
+/* ShootCal Web Calendar - block editor script (vanilla JS, no build).
  *
- * Registers the `shootcal-availability/calendar` block. The editor view shows a
+ * Registers the `shootcal-web-calendar/calendar` block. The editor view shows a
  * static placeholder card with a Calendar URL field (paste a feed right into the
  * block, like the core Embed block) - NOT a live render. The frontend stylesheet
  * isn't loaded in the editor, so a server render of the real grid collapses into
@@ -23,9 +23,10 @@
 	var Placeholder       = wp.components.Placeholder;
 	var TextControl       = wp.components.TextControl;
 	var SelectControl     = wp.components.SelectControl;
+	var ToggleControl     = wp.components.ToggleControl;
 	var __                = wp.i18n.__;
 
-	registerBlockType( 'shootcal-availability/calendar', {
+	registerBlockType( 'shootcal-web-calendar/calendar', {
 		edit: function ( props ) {
 			var attributes    = props.attributes;
 			var setAttributes = props.setAttributes;
@@ -36,12 +37,46 @@
 				: '';
 			var firstDayValue = ( attributes.firstDay === 1 ) ? '1' : '0';
 			var timezoneValue = attributes.timezone || '';
+			var modeValue     = ( attributes.mode === 'full' ) ? 'full' : 'availability';
+			var urlValue      = attributes.url || '';
+			var multiSessionDayValue = ( attributes.multiSessionDay === false ) ? false : true;
 
 			var sidebar = el( InspectorControls, null,
-				el( PanelBody, { title: __( 'Calendar overrides', 'shootcal-availability' ), initialOpen: false },
+				el( PanelBody, { title: __( 'Calendar source', 'shootcal-web-calendar' ), initialOpen: true },
+					el( SelectControl, {
+						label: __( 'Display mode', 'shootcal-web-calendar' ),
+						help: __( 'Availability shows free/busy shading only. Full calendar shows each event title and time.', 'shootcal-web-calendar' ),
+						value: modeValue,
+						options: [
+							{ label: __( 'Availability (free/busy)', 'shootcal-web-calendar' ), value: 'availability' },
+							{ label: __( 'Full calendar (show events)', 'shootcal-web-calendar' ), value: 'full' }
+						],
+						onChange: function ( v ) {
+							setAttributes( { mode: ( v === 'full' ) ? 'full' : 'availability' } );
+						}
+					} ),
 					el( TextControl, {
-						label: __( 'Months to show', 'shootcal-availability' ),
-						help: __( 'Leave blank to use the plugin default. ShootCal sources auto-detect from the feed.', 'shootcal-availability' ),
+						label: __( 'Calendar feed URL', 'shootcal-web-calendar' ),
+						help: __( 'Paste the iCal (.ics) feed URL to display (required). Treat it like a password.', 'shootcal-web-calendar' ),
+						type: 'url',
+						value: urlValue,
+						onChange: function ( v ) {
+							setAttributes( { url: ( v || '' ).trim() } );
+						}
+					} ),
+					( modeValue === 'availability' ) ? el( ToggleControl, {
+						label: __( 'I can take more than one booking per day', 'shootcal-web-calendar' ),
+						help: __( 'On: a day with timed sessions (and no all-day event) shows "Limited" (gold) - partly booked, still open. Off: the first booking marks the whole day "Booked" (coral).', 'shootcal-web-calendar' ),
+						checked: multiSessionDayValue,
+						onChange: function ( v ) {
+							setAttributes( { multiSessionDay: !! v } );
+						}
+					} ) : null
+				),
+				el( PanelBody, { title: __( 'Calendar overrides', 'shootcal-web-calendar' ), initialOpen: false },
+					el( TextControl, {
+						label: __( 'Months to show', 'shootcal-web-calendar' ),
+						help: __( 'Leave blank to use the plugin default. ShootCal sources auto-detect from the feed.', 'shootcal-web-calendar' ),
 						type: 'number',
 						min: 1,
 						max: 36,
@@ -52,19 +87,19 @@
 						}
 					} ),
 					el( SelectControl, {
-						label: __( 'First day of week', 'shootcal-availability' ),
+						label: __( 'First day of week', 'shootcal-web-calendar' ),
 						value: firstDayValue,
 						options: [
-							{ label: __( 'Sunday', 'shootcal-availability' ), value: '0' },
-							{ label: __( 'Monday', 'shootcal-availability' ), value: '1' }
+							{ label: __( 'Sunday', 'shootcal-web-calendar' ), value: '0' },
+							{ label: __( 'Monday', 'shootcal-web-calendar' ), value: '1' }
 						],
 						onChange: function ( v ) {
 							setAttributes( { firstDay: ( v === '1' ) ? 1 : 0 } );
 						}
 					} ),
 					el( TextControl, {
-						label: __( 'Timezone override', 'shootcal-availability' ),
-						help: __( 'IANA identifier, e.g. America/New_York. Leave blank to auto-detect from the feed.', 'shootcal-availability' ),
+						label: __( 'Timezone override', 'shootcal-web-calendar' ),
+						help: __( 'IANA identifier, e.g. America/New_York. Leave blank to auto-detect from the feed.', 'shootcal-web-calendar' ),
 						value: timezoneValue,
 						onChange: function ( v ) {
 							setAttributes( { timezone: ( v || '' ).trim() } );
@@ -75,17 +110,19 @@
 
 			// Override summary shown under the URL field.
 			var summaryBits = [];
-			summaryBits.push( monthsValue ? __( 'Months: ', 'shootcal-availability' ) + monthsValue : __( 'Months: default', 'shootcal-availability' ) );
-			summaryBits.push( ( firstDayValue === '1' ) ? __( 'Week starts Monday', 'shootcal-availability' ) : __( 'Week starts Sunday', 'shootcal-availability' ) );
-			summaryBits.push( timezoneValue ? __( 'Timezone: ', 'shootcal-availability' ) + timezoneValue : __( 'Timezone: auto', 'shootcal-availability' ) );
+			summaryBits.push( ( modeValue === 'full' ) ? __( 'Mode: Full calendar', 'shootcal-web-calendar' ) : __( 'Mode: Availability', 'shootcal-web-calendar' ) );
+			summaryBits.push( urlValue ? __( 'Feed: custom URL', 'shootcal-web-calendar' ) : __( 'Feed: Settings URL', 'shootcal-web-calendar' ) );
+			summaryBits.push( monthsValue ? __( 'Months: ', 'shootcal-web-calendar' ) + monthsValue : __( 'Months: default', 'shootcal-web-calendar' ) );
+			summaryBits.push( ( firstDayValue === '1' ) ? __( 'Week starts Monday', 'shootcal-web-calendar' ) : __( 'Week starts Sunday', 'shootcal-web-calendar' ) );
+			summaryBits.push( timezoneValue ? __( 'Timezone: ', 'shootcal-web-calendar' ) + timezoneValue : __( 'Timezone: auto', 'shootcal-web-calendar' ) );
 
 			// Static placeholder. The live calendar only renders on the published
 			// page; the calendar source is configured once under Settings.
 			var preview = el( 'div', blockProps,
 				el( Placeholder, {
 					icon: 'calendar-alt',
-					label: __( 'ShootCal Availability', 'shootcal-availability' ),
-					instructions: __( 'Your availability calendar renders here on the published page. Set the calendar URL once under Settings > ShootCal Availability. Use the block settings on the right to override months, first day, or timezone for this embed.', 'shootcal-availability' )
+					label: __( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
+					instructions: __( 'Your calendar renders here on the published page. Pick a display mode and optionally paste a feed URL in the block settings on the right, or leave the URL blank to use the one under Settings > ShootCal Web Calendar.', 'shootcal-web-calendar' )
 				},
 					el( 'p', { style: { margin: 0, fontSize: '12px', color: '#646970' } }, summaryBits.join( '  •  ' ) )
 				)

@@ -1,24 +1,24 @@
 <?php
 /**
- * Gutenberg block registration for ShootCal Availability.
+ * Gutenberg block registration for ShootCal Web Calendar.
  *
  * The block is server-rendered: its `render_callback` delegates to the existing
- * Shortcode::render() so the block and `[shootcal_availability]` produce
+ * Shortcode::render() so the block and `[shootcal_web_calendar]` produce
  * identical HTML and share the same feed-fetch + transient cache + parser path.
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
 class Block {
 
-	private const BLOCK_NAME    = 'shootcal-availability/calendar';
-	private const EDITOR_SCRIPT = 'shootcal-availability-block-editor';
+	private const BLOCK_NAME    = 'shootcal-web-calendar/calendar';
+	private const EDITOR_SCRIPT = 'shootcal-web-calendar-block-editor';
 
 	public function register(): void {
 		add_action( 'init', array( $this, 'register_block' ) );
@@ -41,7 +41,7 @@ class Block {
 			VERSION,
 			true
 		);
-		wp_set_script_translations( self::EDITOR_SCRIPT, 'shootcal-availability' );
+		wp_set_script_translations( self::EDITOR_SCRIPT, 'shootcal-web-calendar' );
 
 		register_block_type(
 			PLUGIN_DIR . 'blocks/calendar',
@@ -69,6 +69,16 @@ class Block {
 		if ( ! empty( $attributes['timezone'] ) && is_string( $attributes['timezone'] ) ) {
 			$atts['timezone'] = $attributes['timezone'];
 		}
+		if ( isset( $attributes['mode'] ) && 'full' === $attributes['mode'] ) {
+			$atts['mode'] = 'full';
+		}
+		if ( ! empty( $attributes['url'] ) && is_string( $attributes['url'] ) ) {
+			$atts['url'] = $attributes['url'];
+		}
+		// Default is true; only pass the attribute when the editor turned it off.
+		if ( isset( $attributes['multiSessionDay'] ) && false === $attributes['multiSessionDay'] ) {
+			$atts['multi_session_day'] = '0';
+		}
 
 		$shortcode = new Shortcode();
 		$html      = $shortcode->render( $atts );
@@ -77,8 +87,8 @@ class Block {
 		// handles the shortcode path via the_content filter; in block contexts
 		// (FSE templates, query loops, etc.) the_content might not be the carrier,
 		// so register directly here too.
-		wp_enqueue_style( 'shootcal-availability' );
-		wp_enqueue_script( 'shootcal-availability' );
+		wp_enqueue_style( 'shootcal-web-calendar' );
+		wp_enqueue_script( 'shootcal-web-calendar' );
 
 		return $html;
 	}

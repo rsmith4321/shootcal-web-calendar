@@ -21,12 +21,12 @@
  *   - VTODO / VJOURNAL / VFREEBUSY / VALARM / VTIMEZONE component bodies
  *     (we trust the system tz database to resolve TZIDs).
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -217,10 +217,27 @@ class ICal_Parser {
 			return null;
 		}
 
+		// SUMMARY (the event title) is kept for full-calendar display mode only.
+		// Availability mode ignores it, so this never weakens the privacy default.
+		$summary = isset( $props['SUMMARY'] ) ? $this->unescape_text( (string) $props['SUMMARY']['value'] ) : null;
+
 		return new Event(
 			$start_info['dt'],
 			$end_info['dt'],
-			$start_info['all_day']
+			$start_info['all_day'],
+			$summary
+		);
+	}
+
+	/**
+	 * Unescape an RFC 5545 TEXT value (e.g. SUMMARY): backslash-escaped
+	 * commas, semicolons, newlines, and backslashes.
+	 */
+	private function unescape_text( string $value ): string {
+		return str_replace(
+			array( '\\N', '\\n', '\\,', '\\;', '\\\\' ),
+			array( "\n", "\n", ',', ';', '\\' ),
+			$value
 		);
 	}
 
@@ -343,7 +360,7 @@ class ICal_Parser {
 			if ( in_array( $key, $exdates, true ) ) {
 				continue;
 			}
-			$out[] = new Event( $start, $start->add( $duration ), $base->all_day );
+			$out[] = new Event( $start, $start->add( $duration ), $base->all_day, $base->summary );
 		}
 		return $out;
 	}

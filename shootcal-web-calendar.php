@@ -1,31 +1,31 @@
 <?php
 /**
- * Plugin Name:       ShootCal Availability
+ * Plugin Name:       ShootCal Web Calendar
  * Plugin URI:        https://shootcal.com
- * Description:       Display your Google Calendar availability on your website as a month grid. Reads a private iCal URL and shows busy days without revealing event details.
- * Version:           1.2.1
+ * Description:       Embed an iCal calendar on your site as a month grid - free/busy availability (no event details) or a full calendar with event titles and times. Per-embed feed URL via shortcode or block.
+ * Version:           2.0.0
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Ryan Smith
  * Author URI:        https://www.ryansmithphotography.com
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       shootcal-availability
+ * Text Domain:       shootcal-web-calendar
  * Domain Path:       /languages
  *
- * @package ShootCalAvailability
+ * @package ShootCalWebCalendar
  */
 
 declare( strict_types=1 );
 
-namespace ShootCalAvailability;
+namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '1.2.1';
-const SLUG        = 'shootcal-availability';
-const OPTION_KEY  = 'shootcal_availability_options';
-const CACHE_KEY   = 'shootcal_availability_ical';
+const VERSION     = '2.0.0';
+const SLUG        = 'shootcal-web-calendar';
+const OPTION_KEY  = 'shootcal_web_calendar_options';
+const CACHE_KEY   = 'shootcal_web_calendar_ical';
 const CACHE_TTL   = 10 * MINUTE_IN_SECONDS;
 
 define( __NAMESPACE__ . '\\PLUGIN_FILE', __FILE__ );
@@ -35,7 +35,7 @@ define( __NAMESPACE__ . '\\PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 /**
  * Minimal PSR-4-ish autoloader for our namespace.
  *
- * Maps ShootCalAvailability\Foo_Bar -> includes/class-foo-bar.php
+ * Maps ShootCalWebCalendar\Foo_Bar -> includes/class-foo-bar.php
  */
 spl_autoload_register(
 	static function ( string $class_name ): void {
@@ -55,7 +55,7 @@ spl_autoload_register(
  * Bootstrap the plugin.
  */
 function bootstrap(): void {
-	load_plugin_textdomain( 'shootcal-availability', false, dirname( plugin_basename( PLUGIN_FILE ) ) . '/languages' );
+	load_plugin_textdomain( 'shootcal-web-calendar', false, dirname( plugin_basename( PLUGIN_FILE ) ) . '/languages' );
 
 	( new Settings() )->register();
 	( new Shortcode() )->register();
@@ -73,26 +73,37 @@ function bootstrap(): void {
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\bootstrap' );
 
 /**
- * Activation hook: ensure default options exist.
+ * Activation hook: ensure default options exist, carrying over settings from the
+ * pre-2.0 "ShootCal Availability" plugin if present (the slug rename makes WP see
+ * this as a new plugin, so options don't transfer automatically).
  */
 register_activation_hook(
 	__FILE__,
 	static function (): void {
-		if ( false === get_option( OPTION_KEY ) ) {
-			add_option(
-				OPTION_KEY,
-				array(
-						'calendar_url'       => '',                  // single iCal URL (source auto-detected from host)
-					'months_ahead'       => 3,
-					'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
-					'multi_session_day'  => true,                // true: timed-only days are "Limited"; false: any event = "Booked"
-					'limited_color'      => '#fce3a8',           // base color for Limited cells (rendered at 0.8 opacity)
-					'booked_color'       => '#f6b9a3',           // base color for Booked cells (rendered at 0.8 opacity)
-					'timezone'           => wp_timezone_string(),
-						'ajax_render'        => false,               // Page caching mode off by default
-				)
-			);
+		if ( false !== get_option( OPTION_KEY ) ) {
+			return;
 		}
+
+		// Migrate display settings from the old plugin slug. Drop the removed
+		// single-URL keys - feed URLs now live on each shortcode/block.
+		$legacy = get_option( 'shootcal_availability_options' );
+		if ( is_array( $legacy ) ) {
+			unset( $legacy['calendar_url'], $legacy['source'], $legacy['ical_url'], $legacy['shootcal_feed_url'] );
+			add_option( OPTION_KEY, $legacy );
+			return;
+		}
+
+		add_option(
+			OPTION_KEY,
+			array(
+				'months_ahead'       => 3,
+				'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
+				'limited_color'      => '#fce3a8',           // base color for Limited cells (rendered at 0.8 opacity)
+				'booked_color'       => '#f6b9a3',           // base color for Booked cells (rendered at 0.8 opacity)
+				'timezone'           => '',                  // '' = follow the WordPress site timezone
+				'ajax_render'        => false,               // Page caching mode off by default
+			)
+		);
 	}
 );
 
