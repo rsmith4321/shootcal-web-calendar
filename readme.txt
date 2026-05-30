@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.3
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,7 +71,7 @@ Not yet. Planned for a future release.
 
 = Does it support recurring events? =
 
-Calendar feeds pre-expand recurring events for the visible window, so weekly/monthly bookings show up correctly without the plugin needing to handle RRULE expansion itself.
+Yes. Some feeds (like Google Calendar) pre-expand recurring events; for feeds that don't (such as Apple or Outlook), the plugin expands the common recurrence rules itself - daily, weekly, monthly, and yearly, including interval, count, end date, weekly by-weekday, and excluded dates - so a recurring booking shows on every occurrence within the visible window. Unusual rules (for example "the second Monday of each month") fall back to showing the first occurrence.
 
 = How fresh is the data? =
 
@@ -108,6 +108,12 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 1.2.0 =
+* Recurring events now expand for feeds that do not pre-expand them (such as Apple or Outlook). Previously a recurring booking from those feeds showed only on its first date, which could make booked days look available. The plugin now expands the common recurrence rules - daily, weekly, monthly, and yearly, with interval, count, end date, weekly by-weekday, and excluded dates - across the visible window. Google feeds, which already pre-expand, are unaffected, and unusual rules fall back to the first occurrence.
+* Performance: the rendered calendar is now cached for 10 minutes, keyed to the feed, your settings, and the day. The "Page caching" mode and uncached page views no longer rebuild the whole grid on every request - they serve the cached render and refresh every 10 minutes, or immediately when you clear the cache or change settings. No calendar data is held longer than that window.
+* Fixed: a recurring event using a negative DURATION is no longer silently dropped.
+* Housekeeping: fresh installs seed the current single Calendar URL settings layout, and deactivating the plugin now correctly clears the cached feed.
 
 = 1.1.3 =
 * Rounded corners fix: the card's top and bottom corners now stay cleanly rounded. The calendar keeps its corner clip off so the tap-to-expand booking popover can extend below the grid, and a side effect of that was the toolbar and footer corners poking past the rounded border. The first and last elements now round to match the card.

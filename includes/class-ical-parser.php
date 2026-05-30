@@ -8,10 +8,16 @@
  *   - Line unfolding (RFC 5545 §3.1)
  *   - STATUS:CANCELLED  -> skip
  *   - TRANSP:TRANSPARENT -> skip (event marks user as free, not busy)
+ *   - RRULE expansion for the common subset (FREQ=DAILY|WEEKLY|MONTHLY|YEARLY,
+ *     INTERVAL, COUNT, UNTIL, weekly BYDAY) with EXDATE exclusions, bounded to a
+ *     forward horizon. Feeds that pre-expand recurrence (e.g. Google) are
+ *     unaffected; this is what makes recurring events from feeds that DON'T
+ *     pre-expand (Apple, Outlook) show on every occurrence instead of just once.
  *
  * Intentionally does NOT handle:
- *   - RRULE expansion (Google's iCal feed pre-expands recurring events for the
- *     forward window we care about, so an MVP can skip this).
+ *   - Advanced RRULE parts (BYMONTHDAY, BYSETPOS, ordinal BYDAY like 2MO, BYMONTH,
+ *     etc.) — an event using those keeps its single base instance rather than
+ *     risk rendering a wrong recurrence.
  *   - VTODO / VJOURNAL / VFREEBUSY / VALARM / VTIMEZONE component bodies
  *     (we trust the system tz database to resolve TZIDs).
  *
@@ -25,6 +31,12 @@ namespace ShootCalAvailability;
 defined( 'ABSPATH' ) || exit;
 
 class ICal_Parser {
+
+	/** Hard ceiling on occurrences generated per recurring event (safety net). */
+	private const MAX_OCCURRENCES = 750;
+
+	/** Iteration guard so a pathological rule can't loop forever. */
+	private const MAX_ITERATIONS = 20000;
 
 	/**
 	 * Parse iCal text into a flat array of Event objects.
@@ -47,9 +59,8 @@ class ICal_Parser {
 			}
 			if ( 'END:VEVENT' === $line ) {
 				$in_event = false;
-				$event    = $this->build_event( $current );
-				if ( null !== $event ) {
-					$events[] = $event;
+				foreach ( $this->build_events( $current ) as $built ) {
+					$events[] = $built;
 				}
 				$current = array();
 				continue;
@@ -62,7 +73,14 @@ class ICal_Parser {
 			if ( null === $prop ) {
 				continue;
 			}
-			// Keep the first occurrence of each property (DTSTART/DTEND etc).
+			// EXDATE can legitimately repeat within one VEVENT, and a single line
+			// can carry a comma-separated list; accumulate every one (recurrence
+			// exclusion needs them all) instead of keeping only the first.
+			if ( 'EXDATE' === $prop['name'] ) {
+				$current['__EXDATE'][] = $prop;
+				continue;
+			}
+			// Keep the first occurrence of each other property (DTSTART/DTEND/RRULE etc).
 			if ( ! isset( $current[ $prop['name'] ] ) ) {
 				$current[ $prop['name'] ] = $prop;
 			}
@@ -128,11 +146,38 @@ class ICal_Parser {
 	}
 
 	/**
-	 * Convert a collected property bag into an Event, or null if it should be skipped.
+	 * Build the event(s) a VEVENT produces. Without an RRULE that's one event;
+	 * with a supported RRULE it's the expanded occurrences within a bounded
+	 * forward horizon. Unsupported rules fall back to the single base instance
+	 * (never worse than before recurrence support existed).
+	 *
+	 * @param array<string, mixed> $props
+	 * @return Event[]
+	 */
+	private function build_events( array $props ): array {
+		$base = $this->build_base_event( $props );
+		if ( null === $base ) {
+			return array();
+		}
+		// A modified single instance (RECURRENCE-ID) is a concrete one-off, not a
+		// recurrence master — never expand it.
+		if ( ! isset( $props['RRULE'] ) || isset( $props['RECURRENCE-ID'] ) ) {
+			return array( $base );
+		}
+		$expanded = $this->expand_recurrence( $base, (string) $props['RRULE']['value'], $props );
+		if ( null === $expanded ) {
+			return array( $base ); // unsupported rule: at least the first instance
+		}
+		return $expanded;
+	}
+
+	/**
+	 * Convert a collected property bag into the single base Event, or null if it
+	 * should be skipped.
 	 *
 	 * @param array<string, array{name:string,params:array<string,string>,value:string}> $props
 	 */
-	private function build_event( array $props ): ?Event {
+	private function build_base_event( array $props ): ?Event {
 		if ( ! isset( $props['DTSTART'] ) ) {
 			return null;
 		}
@@ -225,12 +270,17 @@ class ICal_Parser {
 	 * @return array{dt: \DateTimeImmutable, all_day: bool}|null
 	 */
 	private function apply_duration( array $start, string $duration ): ?array {
+		// A leading sign is not part of the ISO-8601 duration grammar that
+		// DateInterval accepts, so strip BOTH '+'/'-' before constructing and
+		// re-apply the sign via ->invert. (Previously only '+' was stripped, so
+		// any negative duration threw and the event was silently dropped.)
+		$duration = trim( $duration );
+		$negative = str_starts_with( $duration, '-' );
 		try {
-			$interval = new \DateInterval( ltrim( $duration, '+' ) );
+			$interval = new \DateInterval( ltrim( $duration, '+-' ) );
 		} catch ( \Exception $e ) {
 			return null;
 		}
-		$negative = str_starts_with( $duration, '-' );
 		if ( $negative ) {
 			$interval->invert = 1;
 		}
@@ -249,6 +299,285 @@ class ICal_Parser {
 			return new \DateTimeZone( $tzid );
 		} catch ( \Exception $e ) {
 			return wp_timezone();
+		}
+	}
+
+	// === Recurrence expansion ================================================
+
+	/**
+	 * Expand a supported RRULE into concrete Event occurrences, bounded by a
+	 * forward horizon so an open-ended rule can't expand forever. Returns null
+	 * when the rule uses features we don't implement (caller falls back to the
+	 * single base instance).
+	 *
+	 * @param array<string, mixed> $props
+	 * @return Event[]|null
+	 */
+	private function expand_recurrence( Event $base, string $rrule, array $props ): ?array {
+		$rule = $this->parse_rrule( $rrule );
+		if ( null === $rule ) {
+			return null;
+		}
+
+		$tz       = $base->start->getTimezone();
+		$duration = $base->start->diff( $base->end );
+		$exdates  = $this->collect_exdate_keys( $props, $base->all_day, $tz );
+
+		// Bound expansion: never past UNTIL, never past ~37 months from now (one
+		// more than the 36-month display cap), and never more than MAX_OCCURRENCES.
+		// `floor` lets a long-running open-ended series skip its (irrelevant) past
+		// occurrences cheaply instead of burning the occurrence budget on history.
+		$now     = new \DateTimeImmutable( 'now', $tz );
+		$horizon = $now->modify( '+37 months' );
+		$floor   = $now->modify( 'first day of this month' )->modify( '-1 month' )->setTime( 0, 0, 0 );
+
+		$starts = $this->generate_starts( $base->start, $rule, $floor, $horizon );
+
+		$out = array();
+		foreach ( $starts as $start ) {
+			$key = $base->all_day
+				? $start->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Ymd' )
+				: $start->setTimezone( $tz )->format( 'Ymd' );
+			// EXDATE-excluded occurrences are dropped here (they still counted
+			// toward COUNT in generate_starts, per RFC 5545).
+			if ( in_array( $key, $exdates, true ) ) {
+				continue;
+			}
+			$out[] = new Event( $start, $start->add( $duration ), $base->all_day );
+		}
+		return $out;
+	}
+
+	/**
+	 * Parse the supported subset of an RRULE value into a normalized array, or
+	 * null if it uses an unsupported feature.
+	 *
+	 * @return array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[]}|null
+	 */
+	private function parse_rrule( string $rrule ): ?array {
+		$parts = array();
+		foreach ( explode( ';', $rrule ) as $seg ) {
+			$eq = strpos( $seg, '=' );
+			if ( false === $eq ) {
+				continue;
+			}
+			$parts[ strtoupper( substr( $seg, 0, $eq ) ) ] = substr( $seg, $eq + 1 );
+		}
+
+		$freq = strtoupper( $parts['FREQ'] ?? '' );
+		if ( ! in_array( $freq, array( 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY' ), true ) ) {
+			return null; // SECONDLY/MINUTELY/HOURLY or missing FREQ -> unsupported
+		}
+
+		// Features we don't implement: bail so the caller keeps the single instance
+		// rather than rendering a wrong recurrence.
+		foreach ( array( 'BYMONTHDAY', 'BYSETPOS', 'BYMONTH', 'BYWEEKNO', 'BYYEARDAY', 'BYHOUR', 'BYMINUTE' ) as $unsupported ) {
+			if ( isset( $parts[ $unsupported ] ) ) {
+				return null;
+			}
+		}
+
+		$byday = array();
+		if ( isset( $parts['BYDAY'] ) && '' !== $parts['BYDAY'] ) {
+			foreach ( explode( ',', $parts['BYDAY'] ) as $d ) {
+				$d = strtoupper( trim( $d ) );
+				if ( ! preg_match( '/^(MO|TU|WE|TH|FR|SA|SU)$/', $d ) ) {
+					return null; // ordinal BYDAY (2MO, -1FR) unsupported
+				}
+				$byday[] = $d;
+			}
+			// We only implement BYDAY for weekly recurrence.
+			if ( 'WEEKLY' !== $freq ) {
+				return null;
+			}
+		}
+
+		return array(
+			'freq'     => $freq,
+			'interval' => isset( $parts['INTERVAL'] ) ? max( 1, (int) $parts['INTERVAL'] ) : 1,
+			'count'    => isset( $parts['COUNT'] ) ? max( 0, (int) $parts['COUNT'] ) : null,
+			'until'    => isset( $parts['UNTIL'] ) ? $this->parse_until( (string) $parts['UNTIL'] ) : null,
+			'byday'    => $byday,
+		);
+	}
+
+	/**
+	 * Parse an RRULE UNTIL value (date, UTC datetime, or local datetime). Always
+	 * resolved against UTC; comparisons elsewhere are by absolute instant.
+	 */
+	private function parse_until( string $value ): ?\DateTimeImmutable {
+		$value = trim( $value );
+		if ( preg_match( '/^\d{8}$/', $value ) ) {
+			// All-day UNTIL is inclusive of that whole day.
+			$dt = \DateTimeImmutable::createFromFormat( '!Ymd', $value, new \DateTimeZone( 'UTC' ) );
+			return false === $dt ? null : $dt->modify( '+1 day -1 second' );
+		}
+		if ( 'Z' === substr( $value, -1 ) ) {
+			$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis\Z', $value, new \DateTimeZone( 'UTC' ) );
+			return false === $dt ? null : $dt;
+		}
+		$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis', $value, new \DateTimeZone( 'UTC' ) );
+		return false === $dt ? null : $dt;
+	}
+
+	/**
+	 * Generate occurrence start datetimes in chronological order, bounded by the
+	 * rule's COUNT/UNTIL and the forward horizon (plus a hard safety cap). EXDATE
+	 * filtering happens in the caller; per RFC 5545 excluded occurrences still
+	 * count toward COUNT, so they ARE generated here.
+	 *
+	 * @param array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[]} $rule
+	 * @return \DateTimeImmutable[]
+	 */
+	private function generate_starts( \DateTimeImmutable $dtstart, array $rule, \DateTimeImmutable $floor, \DateTimeImmutable $horizon ): array {
+		$freq     = $rule['freq'];
+		$interval = $rule['interval'];
+		$count    = $rule['count'];
+		$until    = $rule['until'];
+		$byday    = $rule['byday'];
+
+		$starts  = array();
+		$emitted = 0;
+
+		$within = static function ( \DateTimeImmutable $occ ) use ( $until, $horizon ): bool {
+			if ( null !== $until && $occ > $until ) {
+				return false;
+			}
+			return $occ <= $horizon;
+		};
+		// Past occurrences only matter when COUNT is set (they consume the count).
+		// For open-ended series, skipping them keeps the occurrence budget for the
+		// visible window.
+		$skippable_past = ( null === $count );
+
+		if ( 'WEEKLY' === $freq && array() !== $byday ) {
+			$map     = array( 'MO' => 1, 'TU' => 2, 'WE' => 3, 'TH' => 4, 'FR' => 5, 'SA' => 6, 'SU' => 7 );
+			$targets = array();
+			foreach ( $byday as $d ) {
+				$targets[] = $map[ $d ];
+			}
+			sort( $targets );
+
+			$h = (int) $dtstart->format( 'H' );
+			$i = (int) $dtstart->format( 'i' );
+			$s = (int) $dtstart->format( 's' );
+
+			$week   = 0;
+			$safety = 0;
+			while ( $safety++ < self::MAX_ITERATIONS ) {
+				// Monday of the dtstart week, advanced by whole INTERVAL weeks.
+				$week_start = $dtstart->modify( 'monday this week' )
+					->modify( '+' . ( $week * $interval ) . ' weeks' )
+					->setTime( $h, $i, $s );
+				++$week;
+
+				$week_after_end = ( $week_start > $horizon ) || ( null !== $until && $week_start > $until );
+
+				foreach ( $targets as $n ) {
+					$occ = $week_start->modify( '+' . ( $n - 1 ) . ' days' );
+					if ( $occ < $dtstart ) {
+						continue; // weekdays before the series start (first week only)
+					}
+					if ( ! $within( $occ ) ) {
+						continue;
+					}
+					if ( $skippable_past && $occ < $floor ) {
+						continue;
+					}
+					$starts[] = $occ;
+					++$emitted;
+					if ( ( null !== $count && $emitted >= $count ) || $emitted >= self::MAX_OCCURRENCES ) {
+						return $starts;
+					}
+				}
+
+				if ( $week_after_end ) {
+					break;
+				}
+			}
+			return $starts;
+		}
+
+		// Non-BYDAY: step DTSTART by INTERVAL units. Compute each occurrence from
+		// DTSTART + n*interval (not cumulatively) so MONTHLY/YEARLY don't drift
+		// after a short-month skip.
+		$unit       = array(
+			'DAILY'   => 'days',
+			'WEEKLY'  => 'weeks',
+			'MONTHLY' => 'months',
+			'YEARLY'  => 'years',
+		)[ $freq ];
+		$anchor_day = (int) $dtstart->format( 'd' );
+
+		$n      = 0;
+		$safety = 0;
+		while ( $safety++ < self::MAX_ITERATIONS ) {
+			$occ = $dtstart->modify( '+' . ( $n * $interval ) . ' ' . $unit );
+			++$n;
+			if ( ! $within( $occ ) ) {
+				break;
+			}
+			// MONTHLY/YEARLY: PHP rolls "Jan 31 + 1 month" over to Mar 3. Per RFC
+			// 5545 a period without the anchor day-of-month is simply skipped.
+			if ( ( 'MONTHLY' === $freq || 'YEARLY' === $freq ) && (int) $occ->format( 'd' ) !== $anchor_day ) {
+				continue;
+			}
+			if ( $skippable_past && $occ < $floor ) {
+				continue;
+			}
+			$starts[] = $occ;
+			++$emitted;
+			if ( ( null !== $count && $emitted >= $count ) || $emitted >= self::MAX_OCCURRENCES ) {
+				break;
+			}
+		}
+		return $starts;
+	}
+
+	/**
+	 * Collect EXDATE day-keys (Ymd, in the event's reference timezone) for fast
+	 * exclusion lookup. All-day events key on the UTC date; timed events on the
+	 * event/display timezone date.
+	 *
+	 * @param array<string, mixed> $props
+	 * @return string[]
+	 */
+	private function collect_exdate_keys( array $props, bool $all_day, \DateTimeZone $tz ): array {
+		if ( empty( $props['__EXDATE'] ) || ! is_array( $props['__EXDATE'] ) ) {
+			return array();
+		}
+		$keys = array();
+		foreach ( $props['__EXDATE'] as $prop ) {
+			$ex_tzid = $prop['params']['TZID'] ?? '';
+			$ex_tz   = '' !== $ex_tzid ? ( $this->try_make_tz( $ex_tzid ) ?? $tz ) : $tz;
+			foreach ( explode( ',', $prop['value'] ) as $value ) {
+				$value = trim( $value );
+				if ( '' === $value ) {
+					continue;
+				}
+				if ( preg_match( '/^\d{8}$/', $value ) ) {
+					$dt = \DateTimeImmutable::createFromFormat( '!Ymd', $value, new \DateTimeZone( 'UTC' ) );
+				} elseif ( 'Z' === substr( $value, -1 ) ) {
+					$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis\Z', $value, new \DateTimeZone( 'UTC' ) );
+				} else {
+					$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis', $value, $ex_tz );
+				}
+				if ( false === $dt ) {
+					continue;
+				}
+				$keys[] = $all_day
+					? $dt->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Ymd' )
+					: $dt->setTimezone( $tz )->format( 'Ymd' );
+			}
+		}
+		return $keys;
+	}
+
+	private function try_make_tz( string $name ): ?\DateTimeZone {
+		try {
+			return new \DateTimeZone( $name );
+		} catch ( \Exception $e ) {
+			return null;
 		}
 	}
 }

@@ -3,7 +3,7 @@
  * Plugin Name:       ShootCal Availability
  * Plugin URI:        https://shootcal.com
  * Description:       Display your Google Calendar availability on your website as a month grid. Reads a private iCal URL and shows busy days without revealing event details.
- * Version:           1.1.3
+ * Version:           1.2.0
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Ryan Smith
@@ -22,7 +22,7 @@ namespace ShootCalAvailability;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '1.1.3';
+const VERSION     = '1.2.0';
 const SLUG        = 'shootcal-availability';
 const OPTION_KEY  = 'shootcal_availability_options';
 const CACHE_KEY   = 'shootcal_availability_ical';
@@ -82,15 +82,14 @@ register_activation_hook(
 			add_option(
 				OPTION_KEY,
 				array(
-					'source'             => 'google',           // 'google' | 'shootcal'
-					'ical_url'           => '',                  // Google Calendar secret iCal URL
-					'shootcal_feed_url'  => '',                  // ShootCal-minted feed URL
+						'calendar_url'       => '',                  // single iCal URL (source auto-detected from host)
 					'months_ahead'       => 3,
 					'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
 					'multi_session_day'  => true,                // true: timed-only days are "Limited"; false: any event = "Booked"
 					'limited_color'      => '#fce3a8',           // base color for Limited cells (rendered at 0.8 opacity)
 					'booked_color'       => '#f6b9a3',           // base color for Booked cells (rendered at 0.8 opacity)
 					'timezone'           => wp_timezone_string(),
+						'ajax_render'        => false,               // Page caching mode off by default
 				)
 			);
 		}
@@ -103,6 +102,8 @@ register_activation_hook(
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
-		delete_transient( CACHE_KEY );
+		// Bump the cache version so every per-URL cached feed becomes unreachable
+		// (the bare CACHE_KEY transient never existed under the versioned scheme).
+		Fetcher::flush_cache();
 	}
 );

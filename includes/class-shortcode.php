@@ -140,6 +140,36 @@ class Shortcode {
 			(string) $opts['timezone']
 		);
 
+		// --- Rendered-output cache (the "rate limit" for the AJAX / uncached path) ---
+		// The expensive work below (parse + recurrence expansion + per-day bucketing
+		// + building up to 36 month panels) is cached for CACHE_TTL (10 min), keyed
+		// on every input that changes the output: the feed body, the display options
+		// and per-embed overrides, the resolved timezone, and today's date. So a
+		// public AJAX render - or any uncached page view - re-runs that work at most
+		// once per 10 minutes per distinct view instead of on every request. It
+		// clears itself when the feed refreshes, when settings change, when the
+		// "Clear cache" button bumps the cache version, or when the day rolls over,
+		// and event data is never held beyond the 10-minute window.
+		$today_render_date = ( new \DateTimeImmutable( 'today', $tz ) )->format( 'Y-m-d' );
+		$render_key        = CACHE_KEY . '_html_' . md5(
+			implode(
+				'|',
+				array(
+					(string) get_option( 'shootcal_availability_cache_ver', 0 ),
+					$tz->getName(),
+					$today_render_date,
+					$source,
+					(string) wp_json_encode( $opts ),
+					(string) wp_json_encode( $atts ),
+					$ical,
+				)
+			)
+		);
+		$cached_html = get_transient( $render_key );
+		if ( is_string( $cached_html ) && '' !== $cached_html ) {
+			return $cached_html;
+		}
+
 		$parser = new ICal_Parser();
 		$events = $parser->parse( $ical );
 
@@ -223,10 +253,13 @@ class Shortcode {
 
 		// Single month: skip the toolbar - nothing to navigate.
 		if ( count( $panels ) === 1 ) {
-			return $inline_style . '<div class="shootcal-availability__wrap">' . $panels[0]['html'] . $credit . '</div>';
+			$html = $inline_style . '<div class="shootcal-availability__wrap">' . $panels[0]['html'] . $credit . '</div>';
+		} else {
+			$html = $inline_style . $this->render_paginated( $panels, $active_idx, $today_idx, $credit );
 		}
 
-		return $inline_style . $this->render_paginated( $panels, $active_idx, $today_idx, $credit );
+		set_transient( $render_key, $html, CACHE_TTL );
+		return $html;
 	}
 
 	/**
