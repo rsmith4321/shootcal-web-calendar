@@ -142,7 +142,23 @@ class Settings {
 		// Color pickers - sanitize_hex_color returns null on bad input, fall back to default.
 		$out['limited_color'] = sanitize_hex_color( isset( $input['limited_color'] ) ? (string) $input['limited_color'] : '' ) ?: '#fce3a8';
 		$out['booked_color']  = sanitize_hex_color( isset( $input['booked_color'] )  ? (string) $input['booked_color']  : '' ) ?: '#f6b9a3';
-		$out['timezone']      = isset( $input['timezone'] ) ? sanitize_text_field( (string) $input['timezone'] ) : wp_timezone_string();
+		// Time zone: only store a real IANA identifier. An unrecognized string
+		// would silently fall through to the site default at render time with no
+		// admin feedback, so validate and keep the previous valid zone instead (WP-3).
+		$tz = isset( $input['timezone'] ) ? sanitize_text_field( (string) $input['timezone'] ) : '';
+		if ( '' !== $tz && in_array( $tz, timezone_identifiers_list(), true ) ) {
+			$out['timezone'] = $tz;
+		} else {
+			$prev                = (string) ( $existing['timezone'] ?? '' );
+			$out['timezone']     = in_array( $prev, timezone_identifiers_list(), true ) ? $prev : wp_timezone_string();
+			if ( '' !== $tz ) {
+				add_settings_error(
+					OPTION_KEY,
+					'shootcal_invalid_timezone',
+					__( 'That time zone was not recognized, so the previous setting was kept. Use a value like "America/New_York".', 'shootcal-availability' )
+				);
+			}
+		}
 
 		// If the URL changed, drop the cache so the user sees fresh data.
 		if ( (string) $existing['calendar_url'] !== $out['calendar_url'] ) {

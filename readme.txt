@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -108,6 +108,11 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 1.2.1 =
+* Hardened the GitHub auto-updater so it only installs update packages hosted on GitHub.
+* The public calendar-render endpoint now validates the time-zone parameter, closing a way to bloat the cache with junk entries.
+* The time-zone setting now rejects an unrecognized value and keeps your previous valid zone (with a notice) instead of silently ignoring the entry.
 
 = 1.2.0 =
 * Recurring events now expand for feeds that do not pre-expand them (such as Apple or Outlook). Previously a recurring booking from those feeds showed only on its first date, which could make booked days look available. The plugin now expands the common recurrence rules - daily, weekly, monthly, and yearly, with interval, count, end date, weekly by-weekday, and excluded dates - across the visible window. Google feeds, which already pre-expand, are unaffected, and unusual rules fall back to the first occurrence.

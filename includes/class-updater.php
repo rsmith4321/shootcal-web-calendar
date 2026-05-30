@@ -207,7 +207,7 @@ class Updater {
 			self::GITHUB_REPO
 		);
 
-		$response = wp_remote_get(
+		$response = wp_safe_remote_get(
 			$url,
 			array(
 				'timeout' => 10,
@@ -242,8 +242,15 @@ class Updater {
 					continue;
 				}
 				if ( str_ends_with( strtolower( (string) ( $asset['name'] ?? '' ) ), '.zip' ) ) {
-					$download_url = (string) $asset['browser_download_url'];
-					break;
+					// Host-pin: only trust an asset URL on GitHub's own hosts, so a
+					// tampered API response (or a future API change) can't point the
+					// auto-update package at an attacker-controlled server (WP-1).
+					$candidate = (string) $asset['browser_download_url'];
+					$host      = (string) wp_parse_url( $candidate, PHP_URL_HOST );
+					if ( 'github.com' === $host || str_ends_with( $host, '.githubusercontent.com' ) ) {
+						$download_url = $candidate;
+						break;
+					}
 				}
 			}
 		}

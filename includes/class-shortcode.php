@@ -79,7 +79,11 @@ class Shortcode {
 		}
 		if ( isset( $_POST['timezone'] ) ) {
 			$tz = sanitize_text_field( wp_unslash( (string) $_POST['timezone'] ) );
-			if ( '' !== $tz ) {
+			// Only accept a real IANA zone. This bounds the render-cache key to the
+			// finite set of valid zone names, so a public (nopriv) caller can't
+			// flood the transient store with unique arbitrary strings (WP-2). An
+			// invalid value is dropped and the site default applies, as before.
+			if ( '' !== $tz && in_array( $tz, timezone_identifiers_list(), true ) ) {
 				$atts['timezone'] = $tz;
 			}
 		}
