@@ -523,6 +523,22 @@
 	/* Let the popover tail extend past the card's rounded clip. */
 	.shootcal-availability__wrap { overflow: visible; }
 
+	/* Because the wrap is overflow:visible (so the popover can escape), it can't
+	 * clip its children to the rounded corners the way overflow:hidden would.
+	 * Without help, the first child (toolbar) and last child (legend/credit) are
+	 * plain rectangles whose square corners poke past the card's rounded border,
+	 * making the corners look "cut off." Round their outer corners to match the
+	 * card so the corners stay clean. Inner radius = card radius minus the 1px
+	 * border so the child nests exactly inside the border's curve. */
+	.shootcal-availability__wrap > :first-child {
+		border-top-left-radius: calc(var(--shootcal-wrap-radius) - 1px);
+		border-top-right-radius: calc(var(--shootcal-wrap-radius) - 1px);
+	}
+	.shootcal-availability__wrap > :last-child {
+		border-bottom-left-radius: calc(var(--shootcal-wrap-radius) - 1px);
+		border-bottom-right-radius: calc(var(--shootcal-wrap-radius) - 1px);
+	}
+
 	/* Cell in open state: lifted via z-index. No border-radius trick anymore -
 	 * the popover is now a standalone floating card (wider than the cell, can
 	 * be horizontally nudged at the calendar edges) so trying to "join" it to

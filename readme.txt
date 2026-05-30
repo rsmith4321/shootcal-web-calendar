@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.2
+Stable tag: 1.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -108,6 +108,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 1.1.3 =
+* Rounded corners fix: the card's top and bottom corners now stay cleanly rounded. The calendar keeps its corner clip off so the tap-to-expand booking popover can extend below the grid, and a side effect of that was the toolbar and footer corners poking past the rounded border. The first and last elements now round to match the card.
 
 = 1.1.2 =
 * Grid lines hardened: the divider lines between weeks and day columns, and the lines that close the bottom of the card (above and below the color legend), now stay visible under themes that zero out borders (for example a CSS reset like `* { border: 0 }`). They were previously stripped on such themes, leaving the grid and legend without their separating lines.
