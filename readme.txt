@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -108,6 +108,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 1.1.1 =
+* Style isolation: the color legend and the "Calendar provided by" footer now hold their own layout against themes that style lists and paragraphs in the content area. Previously a theme's `ul` / `li` / `p` rules could strip the footer's right padding, indent the legend, or add stray bullets. The box model for both is now locked the same way the toolbar and grid already were, while colors and fonts stay overridable.
 
 = 1.1.0 =
 * Single Calendar URL: one setting field now holds the calendar URL, and the plugin auto-detects whether it is a ShootCal feed or a plain iCal feed. The old Google / ShootCal source toggle is gone. Existing setups are migrated automatically.

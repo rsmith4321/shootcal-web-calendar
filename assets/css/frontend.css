@@ -651,32 +651,44 @@
 		display: block;
 	}
 
-	/* --- Legend (color key) --- */
+	/* --- Legend (color key) ---
+	 *
+	 * This is a <ul> of <li>s, so it is exposed to any theme rule on `ul`/`li`
+	 * in the post-content area (list margins, left padding, bullets, display
+	 * flips). Because the whole plugin sits in @layer, those UNLAYERED theme
+	 * rules win over normal layered declarations - so the box-model + list
+	 * properties here are pinned with !important, matching how the toolbar and
+	 * day cells defend themselves. Colors/typography stay overridable. */
 	.shootcal-availability__legend {
-		display: flex;
-		flex-wrap: wrap;
+		display: flex !important;
+		flex-wrap: wrap !important;
 		align-items: center;
 		gap: 0.4rem 1.4rem;
-		margin: 0;
-		padding: 0.75rem 1rem;
-		list-style: none;
+		margin: 0 !important;
+		padding: 0.75rem 1rem !important;
+		list-style: none !important;
 		border-top: 1px solid var(--shootcal-grid-line);
 		font-size: 0.85rem;
 		color: var(--shootcal-muted);
 	}
 	.shootcal-availability__legend-item {
-		display: inline-flex;
+		display: inline-flex !important;
 		align-items: center;
 		gap: 0.4rem;
-		margin: 0;
-		list-style: none;
+		margin: 0 !important;
+		padding: 0 !important;
+		list-style: none !important;
 	}
+	/* Defeat any theme rule that injects list bullets via ::before/::marker. */
+	.shootcal-availability__legend-item::before { content: none !important; }
+	.shootcal-availability__legend-item::marker { content: "" !important; }
 	.shootcal-availability__legend-swatch {
-		display: inline-block;
-		width: 1rem;
-		height: 1rem;
+		display: inline-block !important;
+		width: 1rem !important;
+		height: 1rem !important;
 		border-radius: 3px;
 		flex-shrink: 0;
+		box-sizing: border-box;
 	}
 	.shootcal-availability__legend-swatch--available {
 		background: var(--shootcal-available-bg);
@@ -689,16 +701,21 @@
 		background: rgba( var(--shootcal-booked-bg-rgb), 1 );
 	}
 
-	/* --- Attribution --- */
+	/* --- Attribution ---
+	 * This is a <p>, so a theme rule like `.entry-content p { padding: 0 }`
+	 * (unlayered) would otherwise win over the layered padding and the text
+	 * would run to the card's right edge. Pin the box-model + alignment with
+	 * !important; leave color/size overridable. */
 	.shootcal-availability__credit {
-		margin: 0;
-		padding: 0.5rem 1rem 0.55rem;
+		margin: 0 !important;
+		padding: 0.5rem 1rem 0.55rem !important;
 		font-size: 0.7rem;
 		line-height: 1.4;
 		color: var(--shootcal-credit-fg);
-		text-align: right;
+		text-align: right !important;
 		border-top: 1px solid var(--shootcal-grid-line);
 		background: var(--shootcal-out-bg);
+		box-sizing: border-box;
 	}
 	.shootcal-availability__credit a {
 		color: inherit;
