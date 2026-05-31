@@ -328,21 +328,21 @@ class Shortcode {
 		$legend       = ( 'full' === $mode ) ? '' : $this->legend_html( $multi_session_day );
 		$credit       = $legend . $this->credit_html( $source );
 
-		// Per-embed cell-color overrides (availability mode only). Returns a scope
-		// class to add to this calendar's wrap plus a scoped <style> block, so two
-		// embeds on one page with different colors don't clobber each other.
-		// Default/empty colors yield no class and no style - the stylesheet's
-		// built-in defaults apply and the page stays light.
+		// Per-embed cell-color overrides (availability mode only), emitted as CSS
+		// custom properties on the wrap's own inline style attribute. Default/empty
+		// colors yield an empty string, so the stylesheet's built-in defaults apply
+		// and the page stays light. An inline style attribute (unlike a <style>
+		// block) needs no enqueue and travels with the cached and AJAX-rendered
+		// HTML, and a custom property set inline outranks the .__wrap defaults.
 		$limited_hex = ( 'full' === $mode ) ? '' : (string) sanitize_hex_color( (string) $atts['limited_color'] );
 		$booked_hex  = ( 'full' === $mode ) ? '' : (string) sanitize_hex_color( (string) $atts['booked_color'] );
-		$color       = $this->color_style( $limited_hex, $booked_hex );
-		$wrap_class  = '' !== $color['class'] ? ' ' . $color['class'] : '';
+		$color_attr  = $this->color_style_attr( $limited_hex, $booked_hex );
 
 		// Single month: skip the toolbar - nothing to navigate.
 		if ( count( $panels ) === 1 ) {
-			$html = $color['style'] . '<div class="' . esc_attr( 'shootcal-web-calendar__wrap' . $wrap_class ) . '">' . $panels[0]['html'] . $credit . '</div>';
+			$html = '<div class="shootcal-web-calendar__wrap"' . $color_attr . '>' . $panels[0]['html'] . $credit . '</div>';
 		} else {
-			$html = $color['style'] . $this->render_paginated( $panels, $active_idx, $today_idx, $credit, $color['class'] );
+			$html = $this->render_paginated( $panels, $active_idx, $today_idx, $credit, $color_attr );
 		}
 
 		set_transient( $render_key, $html, CACHE_TTL );
@@ -350,20 +350,21 @@ class Shortcode {
 	}
 
 	/**
-	 * Build the per-embed cell-color override: a scope class plus a scoped
-	 * `<style>` block that sets the Limited/Booked CSS color variables for just
-	 * this calendar instance. Colors arrive as sanitized hex (or '' for default);
-	 * the variables are RGB triplets so the stylesheet can wrap them in rgba() to
-	 * render 80% opacity at rest and 100% on hover (the chosen color is the peak).
+	 * Build the per-embed cell-color override as an inline `style` attribute that
+	 * sets the Limited/Booked CSS color variables on this calendar's wrap element.
+	 * Colors arrive as sanitized hex (or '' for default); the variables are RGB
+	 * triplets so the stylesheet can wrap them in rgba() to render 80% opacity at
+	 * rest and 100% on hover (the chosen color is the peak).
 	 *
 	 * When both colors resolve to the built-in defaults we emit nothing - the
-	 * stylesheet's own defaults apply and the page stays light. The scope class is
-	 * derived deterministically from the two colors, so two embeds with identical
-	 * colors share one rule, and two with different colors stay isolated.
+	 * stylesheet's own defaults apply and the page stays light. A custom property
+	 * set on the element's own style attribute outranks the stylesheet's `.__wrap`
+	 * defaults without !important, and - unlike a `<style>` block - it carries with
+	 * the cached and AJAX-rendered HTML and needs no enqueue.
 	 *
-	 * @return array{class:string, style:string}
+	 * @return string Leading-space ` style="..."` attribute, or '' for defaults.
 	 */
-	private function color_style( string $limited_hex, string $booked_hex ): array {
+	private function color_style_attr( string $limited_hex, string $booked_hex ): string {
 		$limited_rgb = $this->hex_to_rgb_triplet( '' !== $limited_hex ? $limited_hex : '#fce3a8' );
 		$booked_rgb  = $this->hex_to_rgb_triplet( '' !== $booked_hex  ? $booked_hex  : '#f6b9a3' );
 
@@ -373,27 +374,18 @@ class Shortcode {
 			'246, 185, 163' => true, // #f6b9a3
 		);
 		if ( isset( $defaults[ $limited_rgb ] ) && isset( $defaults[ $booked_rgb ] ) ) {
-			return array(
-				'class' => '',
-				'style' => '',
-			);
+			return '';
 		}
 
-		// Deterministic scope class (safe charset: "sc-clr-" + hex digits).
-		$scope = 'sc-clr-' . substr( md5( $limited_rgb . '|' . $booked_rgb ), 0, 10 );
-
-		// The two-class selector (.__wrap.sc-clr-xxxx) outranks the single-class
-		// .__wrap rule where the variable defaults live, so the override wins
-		// without !important. Both are unlayered, so layer order doesn't matter.
-		$style = sprintf(
-			'<style>.shootcal-web-calendar__wrap.%1$s{--shootcal-limited-bg-rgb:%2$s;--shootcal-booked-bg-rgb:%3$s;}</style>',
-			$scope,
-			esc_attr( $limited_rgb ),
-			esc_attr( $booked_rgb )
-		);
-		return array(
-			'class' => $scope,
-			'style' => $style,
+		return sprintf(
+			' style="%s"',
+			esc_attr(
+				sprintf(
+					'--shootcal-limited-bg-rgb:%1$s;--shootcal-booked-bg-rgb:%2$s;',
+					$limited_rgb,
+					$booked_rgb
+				)
+			)
 		);
 	}
 
@@ -419,13 +411,13 @@ class Shortcode {
 	 *
 	 * @param array<int, array{idx:int,year:int,month:int,label:string,html:string}> $panels
 	 */
-	private function render_paginated( array $panels, int $active_idx, int $today_idx, string $credit, string $extra_class = '' ): string {
+	private function render_paginated( array $panels, int $active_idx, int $today_idx, string $credit, string $style_attr = '' ): string {
 		$total       = count( $panels );
 		$first_label = $panels[0]['label'];
 		$last_label  = $panels[ $total - 1 ]['label'];
 
-		$wrap_classes = 'shootcal-web-calendar__wrap shootcal-web-calendar__wrap--paginated' . ( '' !== $extra_class ? ' ' . $extra_class : '' );
-		$html  = '<div class="' . esc_attr( $wrap_classes ) . '" data-shootcal-total="' . (int) $total . '" data-shootcal-today="' . (int) $today_idx . '" data-shootcal-active="' . (int) $active_idx . '">';
+		$wrap_classes = 'shootcal-web-calendar__wrap shootcal-web-calendar__wrap--paginated';
+		$html  = '<div class="' . esc_attr( $wrap_classes ) . '"' . $style_attr . ' data-shootcal-total="' . (int) $total . '" data-shootcal-today="' . (int) $today_idx . '" data-shootcal-active="' . (int) $active_idx . '">';
 
 		// Toolbar - month label on the left, navigation group (< Today >) on the right.
 		$html .= '<div class="shootcal-web-calendar__toolbar" role="group" aria-label="' . esc_attr__( 'Calendar navigation', 'shootcal-web-calendar' ) . '">';
