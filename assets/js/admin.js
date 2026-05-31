@@ -8,13 +8,21 @@
 
 	var C = window.ShootCalWebCalendar || { i18n: {} };
 
+	// Built-in cell-color defaults. When a picker matches its default we omit the
+	// attribute, so "default" means "no attribute" and the stylesheet's own colors
+	// apply (smaller markup, and the embed tracks any future default change).
+	var DEFAULT_LIMITED = '#fce3a8';
+	var DEFAULT_BOOKED  = '#f6b9a3';
+
 	function currentInputs() {
 		var url    = ( $( '#shootcal-gen-url' ).val() || '' ).trim();
 		var mode   = $( '#shootcal-gen-mode' ).val() || 'availability';
 		var months = parseInt( $( '#shootcal-gen-months' ).val(), 10 );
 		months = ( isNaN( months ) || months < 1 ) ? '' : Math.min( 36, months );
 		var msd = $( '#shootcal-gen-msd' ).length ? $( '#shootcal-gen-msd' ).is( ':checked' ) : true;
-		return { url: url, mode: mode, months: months, msd: msd };
+		var limitedColor = ( $( '#shootcal-gen-limited-color' ).val() || '' ).toLowerCase();
+		var bookedColor  = ( $( '#shootcal-gen-booked-color' ).val() || '' ).toLowerCase();
+		return { url: url, mode: mode, months: months, msd: msd, limitedColor: limitedColor, bookedColor: bookedColor };
 	}
 
 	function buildShortcode( v ) {
@@ -22,11 +30,22 @@
 		if ( 'full' === v.mode ) { sc += ' mode="full"'; }
 		sc += ' url="' + v.url + '"';
 		if ( v.months ) { sc += ' months="' + v.months + '"'; }
-		// Sessions-per-day applies to availability mode only; default is on, so emit
-		// it only when the user turned it off.
-		if ( 'availability' === v.mode && ! v.msd ) { sc += ' multi_session_day="0"'; }
+		// Sessions-per-day + cell colors apply to availability mode only.
+		if ( 'availability' === v.mode ) {
+			// Default is on, so emit only when the user turned it off.
+			if ( ! v.msd ) { sc += ' multi_session_day="0"'; }
+			// Emit a color only when it differs from the built-in default.
+			if ( v.limitedColor && v.limitedColor !== DEFAULT_LIMITED ) { sc += ' limited_color="' + v.limitedColor + '"'; }
+			if ( v.bookedColor && v.bookedColor !== DEFAULT_BOOKED ) { sc += ' booked_color="' + v.bookedColor + '"'; }
+		}
 		sc += ']';
 		return sc;
+	}
+
+	// Availability-only rows (sessions-per-day + colors) hide in full mode.
+	function syncModeRows() {
+		var isAvail = ( $( '#shootcal-gen-mode' ).val() || 'availability' ) === 'availability';
+		$( '.shootcal-gen-availability-row' ).toggle( isAvail );
 	}
 
 	$( document ).on( 'click', '#shootcal-generate', function ( e ) {
@@ -73,8 +92,12 @@
 			} );
 	} );
 
+	// Show/hide the availability-only rows when the mode changes.
+	$( document ).on( 'change', '#shootcal-gen-mode', syncModeRows );
+	$( syncModeRows );
+
 	// Keep the generated shortcode in sync if the user tweaks inputs afterward.
-	$( document ).on( 'change input', '#shootcal-gen-mode, #shootcal-gen-months, #shootcal-gen-url, #shootcal-gen-msd', function () {
+	$( document ).on( 'change input', '#shootcal-gen-mode, #shootcal-gen-months, #shootcal-gen-url, #shootcal-gen-msd, #shootcal-gen-limited-color, #shootcal-gen-booked-color', function () {
 		var $output = $( '#shootcal-gen-output' );
 		if ( ! $output.is( ':visible' ) ) { return; }
 		var v = currentInputs();

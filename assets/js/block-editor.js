@@ -17,9 +17,10 @@
 	var registerBlockType = wp.blocks.registerBlockType;
 	var el                = wp.element.createElement;
 	var Fragment          = wp.element.Fragment;
-	var useBlockProps     = wp.blockEditor.useBlockProps;
-	var InspectorControls = wp.blockEditor.InspectorControls;
-	var PanelBody         = wp.components.PanelBody;
+	var useBlockProps      = wp.blockEditor.useBlockProps;
+	var InspectorControls  = wp.blockEditor.InspectorControls;
+	var PanelColorSettings = wp.blockEditor.PanelColorSettings;
+	var PanelBody          = wp.components.PanelBody;
 	var Placeholder       = wp.components.Placeholder;
 	var TextControl       = wp.components.TextControl;
 	var SelectControl     = wp.components.SelectControl;
@@ -40,6 +41,27 @@
 			var modeValue     = ( attributes.mode === 'full' ) ? 'full' : 'availability';
 			var urlValue      = attributes.url || '';
 			var multiSessionDayValue = ( attributes.multiSessionDay === false ) ? false : true;
+			var limitedColorValue = attributes.limitedColor || '';
+			var bookedColorValue  = attributes.bookedColor || '';
+
+			// Per-embed cell colors apply to availability mode only. Empty = the
+			// built-in defaults (soft gold / coral); the server falls back when unset.
+			var colorPanel = ( modeValue === 'availability' ) ? el( PanelColorSettings, {
+				title: __( 'Availability colors', 'shootcal-web-calendar' ),
+				initialOpen: false,
+				colorSettings: [
+					{
+						label: __( 'Limited day color', 'shootcal-web-calendar' ),
+						value: limitedColorValue || undefined,
+						onChange: function ( v ) { setAttributes( { limitedColor: v || '' } ); }
+					},
+					{
+						label: __( 'Booked day color', 'shootcal-web-calendar' ),
+						value: bookedColorValue || undefined,
+						onChange: function ( v ) { setAttributes( { bookedColor: v || '' } ); }
+					}
+				]
+			} ) : null;
 
 			var sidebar = el( InspectorControls, null,
 				el( PanelBody, { title: __( 'Calendar source', 'shootcal-web-calendar' ), initialOpen: true },
@@ -73,6 +95,7 @@
 						}
 					} ) : null
 				),
+				colorPanel,
 				el( PanelBody, { title: __( 'Calendar overrides', 'shootcal-web-calendar' ), initialOpen: false },
 					el( TextControl, {
 						label: __( 'Months to show', 'shootcal-web-calendar' ),

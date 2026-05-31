@@ -87,8 +87,6 @@ register_activation_hook(
 			array(
 				'months_ahead'       => 3,
 				'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
-				'limited_color'      => '#fce3a8',           // base color for Limited cells (rendered at 0.8 opacity)
-				'booked_color'       => '#f6b9a3',           // base color for Booked cells (rendered at 0.8 opacity)
 				'ajax_render'        => false,               // Page caching mode off by default
 			)
 		);

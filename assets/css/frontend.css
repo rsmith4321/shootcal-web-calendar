@@ -96,9 +96,10 @@
 	--shootcal-available-fg: #1f2937;
 
 	/* Limited + Booked cell colors are stored as RGB triplets so they can be
-	 * rendered at 0.8 opacity at rest and 1.0 on hover via rgba(). The plugin's
-	 * Settings page exposes color pickers that emit overrides for these via an
-	 * inline <style> when the user picks non-default colors. */
+	 * rendered at 0.8 opacity at rest and 1.0 on hover via rgba(). Each embed
+	 * (shortcode generator / block, availability mode only) can override these:
+	 * the plugin emits a per-instance inline <style> scoped to that calendar's
+	 * wrap when non-default colors are picked. */
 	--shootcal-limited-bg-rgb: 252, 227, 168; /* #fce3a8 default */
 	--shootcal-limited-fg: #7a4f1a;
 	--shootcal-booked-bg-rgb:  246, 185, 163; /* #f6b9a3 default */
@@ -376,10 +377,10 @@
 	}
 	.shootcal-web-calendar__day:first-child { border-left: none !important; }
 
-	/* Three busy states - the user picks the "peak" color via Settings; the cell
-	 * renders at 0.8 opacity at rest and rises to 1.0 (full) on hover or when
-	 * a popover is open. Computed via rgba() against the RGB triplet variables
-	 * so override is a single style override. */
+	/* Three busy states - the "peak" color comes from the per-embed pickers (or
+	 * the built-in defaults); the cell renders at 0.8 opacity at rest and rises to
+	 * 1.0 (full) on hover or when a popover is open. Computed via rgba() against
+	 * the RGB triplet variables so override is a single style override. */
 	.shootcal-web-calendar__day.is-booked {
 		background: rgba( var(--shootcal-booked-bg-rgb), 0.8 );
 		color: var(--shootcal-booked-fg);

@@ -38,6 +38,14 @@
 		"multiSessionDay": {
 			"type": "boolean",
 			"default": true
+		},
+		"limitedColor": {
+			"type": "string",
+			"default": ""
+		},
+		"bookedColor": {
+			"type": "string",
+			"default": ""
 		}
 	},
 	"editorScript": "shootcal-web-calendar-block-editor"

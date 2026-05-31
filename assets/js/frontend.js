@@ -230,6 +230,8 @@
 			if ( typeof box.dataset.shootcalFirstDay !== 'undefined' ) body.set( 'first_day', box.dataset.shootcalFirstDay );
 			if ( box.dataset.shootcalTimezone ) body.set( 'timezone', box.dataset.shootcalTimezone );
 			if ( box.dataset.shootcalMsd ) body.set( 'msd', box.dataset.shootcalMsd );
+			if ( box.dataset.shootcalLimitedColor ) body.set( 'limited_color', box.dataset.shootcalLimitedColor );
+			if ( box.dataset.shootcalBookedColor ) body.set( 'booked_color', box.dataset.shootcalBookedColor );
 			if ( box.dataset.shootcalSig ) body.set( 'sig', box.dataset.shootcalSig );
 
 			fetch( window.ShootCalWebCalendarFront.ajaxUrl, {

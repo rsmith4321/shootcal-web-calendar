@@ -54,10 +54,8 @@ class Settings {
 			array( $this, 'field_months_ahead' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'first_day_of_week', __( 'First day of week', 'shootcal-web-calendar' ),
 			array( $this, 'field_first_day_of_week' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
-		add_settings_field( 'limited_color', __( 'Limited day color', 'shootcal-web-calendar' ),
-			array( $this, 'field_limited_color' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
-		add_settings_field( 'booked_color', __( 'Booked day color', 'shootcal-web-calendar' ),
-			array( $this, 'field_booked_color' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
+		// Cell colors are per-embed now (picked in the shortcode generator / block,
+		// availability mode only) - no site-wide color setting here.
 		add_settings_field( 'ajax_render', __( 'Page caching', 'shootcal-web-calendar' ),
 			array( $this, 'field_ajax_render' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 	}
@@ -66,23 +64,11 @@ class Settings {
 		$defaults = array(
 			'months_ahead'      => 3,
 			'first_day_of_week' => 0,
-			'limited_color'     => '#fce3a8',
-			'booked_color'      => '#f6b9a3',
 			'ajax_render'       => false,
 		);
 
 		$options = get_option( OPTION_KEY, array() );
 		$options = is_array( $options ) ? $options : array();
-
-		// Installs that never changed the cell colors have the pre-1.1.9 defaults
-		// saved; bump them to the new, more-distinct defaults so they aren't stuck
-		// on the old near-identical tints. Genuinely custom colors are left alone.
-		if ( isset( $options['limited_color'] ) && '#fdf2dd' === strtolower( (string) $options['limited_color'] ) ) {
-			$options['limited_color'] = '#fce3a8';
-		}
-		if ( isset( $options['booked_color'] ) && '#fae0cf' === strtolower( (string) $options['booked_color'] ) ) {
-			$options['booked_color'] = '#f6b9a3';
-		}
 
 		return wp_parse_args( $options, $defaults );
 	}
@@ -90,20 +76,17 @@ class Settings {
 	public function sanitize( $input ): array {
 		$out = self::get_options();
 
-		// Drop legacy URL keys - feed URLs now live on each shortcode/block, not
-		// in Settings.
-		unset( $out['source'], $out['ical_url'], $out['shootcal_feed_url'], $out['calendar_url'] );
+		// Drop legacy keys - feed URLs and cell colors now live on each
+		// shortcode/block, not in Settings.
+		unset( $out['source'], $out['ical_url'], $out['shootcal_feed_url'], $out['calendar_url'], $out['limited_color'], $out['booked_color'] );
 
 		$out['months_ahead']      = isset( $input['months_ahead'] ) ? max( 1, min( 36, (int) $input['months_ahead'] ) ) : 3;
 		$out['first_day_of_week'] = isset( $input['first_day_of_week'] ) ? ( 1 === (int) $input['first_day_of_week'] ? 1 : 0 ) : 0;
 		$out['ajax_render']       = ! empty( $input['ajax_render'] );
-
-		// Color pickers - sanitize_hex_color returns null on bad input, fall back to default.
-		$out['limited_color'] = sanitize_hex_color( isset( $input['limited_color'] ) ? (string) $input['limited_color'] : '' ) ?: '#fce3a8';
-		$out['booked_color']  = sanitize_hex_color( isset( $input['booked_color'] )  ? (string) $input['booked_color']  : '' ) ?: '#f6b9a3';
 		// The calendar's display timezone follows WordPress (Settings > General);
 		// there is no plugin timezone setting. A per-embed timezone="..." attribute
-		// can still override it on a specific shortcode/block.
+		// can still override it on a specific shortcode/block. Cell colors are also
+		// per-embed (shortcode generator / block, availability mode only).
 
 		return $out;
 	}
@@ -134,26 +117,6 @@ class Settings {
 			selected( $val, 1, false ),
 			esc_html__( 'Monday', 'shootcal-web-calendar' )
 		);
-	}
-
-	public function field_limited_color(): void {
-		$opts = self::get_options();
-		printf(
-			'<input type="color" name="%1$s[limited_color]" id="limited_color" value="%2$s" />',
-			esc_attr( OPTION_KEY ),
-			esc_attr( $opts['limited_color'] )
-		);
-		echo '<p class="description">' . esc_html__( 'Cells render at 80% of this color by default and animate to 100% on hover. Pick the vivid version - the calendar automatically tones it down at rest.', 'shootcal-web-calendar' ) . '</p>';
-	}
-
-	public function field_booked_color(): void {
-		$opts = self::get_options();
-		printf(
-			'<input type="color" name="%1$s[booked_color]" id="booked_color" value="%2$s" />',
-			esc_attr( OPTION_KEY ),
-			esc_attr( $opts['booked_color'] )
-		);
-		echo '<p class="description">' . esc_html__( 'Cells render at 80% of this color by default and animate to 100% on hover. Same 80/100 pattern as Limited.', 'shootcal-web-calendar' ) . '</p>';
 	}
 
 	public function field_ajax_render(): void {
@@ -224,11 +187,25 @@ class Settings {
 						</select>
 					</td>
 				</tr>
-				<tr>
+				<tr class="shootcal-gen-availability-row">
 					<th scope="row"><?php esc_html_e( 'Bookings per day', 'shootcal-web-calendar' ); ?></th>
 					<td>
 						<label><input type="checkbox" id="shootcal-gen-msd" checked /> <?php esc_html_e( 'I can take more than one booking per day', 'shootcal-web-calendar' ); ?></label>
 						<p class="description"><?php esc_html_e( 'Availability mode only. This decides how a day with one or more timed sessions (and no all-day event) looks to visitors. Checked: that day shows as "Limited" - partly booked, but you still have open time, so visitors know they can ask. Unchecked: the first booking marks the whole day "Booked", like an all-day commitment.', 'shootcal-web-calendar' ); ?></p>
+					</td>
+				</tr>
+				<tr class="shootcal-gen-availability-row">
+					<th scope="row"><label for="shootcal-gen-limited-color"><?php esc_html_e( 'Limited day color', 'shootcal-web-calendar' ); ?></label></th>
+					<td>
+						<input type="color" id="shootcal-gen-limited-color" value="#fce3a8" />
+						<p class="description"><?php esc_html_e( 'Availability mode only. Shading for a "Limited" (partly booked) day. Cells render at 80% of this color and deepen to 100% on hover. Leave at the default to use the built-in soft gold.', 'shootcal-web-calendar' ); ?></p>
+					</td>
+				</tr>
+				<tr class="shootcal-gen-availability-row">
+					<th scope="row"><label for="shootcal-gen-booked-color"><?php esc_html_e( 'Booked day color', 'shootcal-web-calendar' ); ?></label></th>
+					<td>
+						<input type="color" id="shootcal-gen-booked-color" value="#f6b9a3" />
+						<p class="description"><?php esc_html_e( 'Availability mode only. Shading for a fully "Booked" day. Same 80% / 100%-on-hover treatment. Leave at the default to use the built-in soft coral.', 'shootcal-web-calendar' ); ?></p>
 					</td>
 				</tr>
 				<tr>

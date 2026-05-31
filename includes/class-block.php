@@ -69,7 +69,8 @@ class Block {
 		if ( ! empty( $attributes['timezone'] ) && is_string( $attributes['timezone'] ) ) {
 			$atts['timezone'] = $attributes['timezone'];
 		}
-		if ( isset( $attributes['mode'] ) && 'full' === $attributes['mode'] ) {
+		$is_full = ( isset( $attributes['mode'] ) && 'full' === $attributes['mode'] );
+		if ( $is_full ) {
 			$atts['mode'] = 'full';
 		}
 		if ( ! empty( $attributes['url'] ) && is_string( $attributes['url'] ) ) {
@@ -78,6 +79,14 @@ class Block {
 		// Default is true; only pass the attribute when the editor turned it off.
 		if ( isset( $attributes['multiSessionDay'] ) && false === $attributes['multiSessionDay'] ) {
 			$atts['multi_session_day'] = '0';
+		}
+		// Per-embed cell colors apply to availability mode only; the shortcode
+		// sanitizes the hex and falls back to the defaults on anything invalid.
+		if ( ! $is_full && ! empty( $attributes['limitedColor'] ) && is_string( $attributes['limitedColor'] ) ) {
+			$atts['limited_color'] = $attributes['limitedColor'];
+		}
+		if ( ! $is_full && ! empty( $attributes['bookedColor'] ) && is_string( $attributes['bookedColor'] ) ) {
+			$atts['booked_color'] = $attributes['bookedColor'];
 		}
 
 		$shortcode = new Shortcode();
