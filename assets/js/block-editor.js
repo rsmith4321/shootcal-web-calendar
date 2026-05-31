@@ -66,7 +66,7 @@
 					} ),
 					( modeValue === 'availability' ) ? el( ToggleControl, {
 						label: __( 'I can take more than one booking per day', 'shootcal-web-calendar' ),
-						help: __( 'On: a day with timed sessions (and no all-day event) shows "Limited" (gold) - partly booked, still open. Off: the first booking marks the whole day "Booked" (coral).', 'shootcal-web-calendar' ),
+						help: __( 'On: a day with timed sessions (and no all-day event) shows as "Limited" - partly booked, still open. Off: the first booking marks the whole day "Booked".', 'shootcal-web-calendar' ),
 						checked: multiSessionDayValue,
 						onChange: function ( v ) {
 							setAttributes( { multiSessionDay: !! v } );

@@ -58,8 +58,6 @@ class Settings {
 			array( $this, 'field_limited_color' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'booked_color', __( 'Booked day color', 'shootcal-web-calendar' ),
 			array( $this, 'field_booked_color' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
-		add_settings_field( 'timezone', __( 'Display timezone', 'shootcal-web-calendar' ),
-			array( $this, 'field_timezone' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 		add_settings_field( 'ajax_render', __( 'Page caching', 'shootcal-web-calendar' ),
 			array( $this, 'field_ajax_render' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 	}
@@ -70,7 +68,6 @@ class Settings {
 			'first_day_of_week' => 0,
 			'limited_color'     => '#fce3a8',
 			'booked_color'      => '#f6b9a3',
-			'timezone'          => '', // '' = follow the WordPress site timezone
 			'ajax_render'       => false,
 		);
 
@@ -91,8 +88,7 @@ class Settings {
 	}
 
 	public function sanitize( $input ): array {
-		$existing = self::get_options();
-		$out      = self::get_options();
+		$out = self::get_options();
 
 		// Drop legacy URL keys - feed URLs now live on each shortcode/block, not
 		// in Settings.
@@ -105,21 +101,9 @@ class Settings {
 		// Color pickers - sanitize_hex_color returns null on bad input, fall back to default.
 		$out['limited_color'] = sanitize_hex_color( isset( $input['limited_color'] ) ? (string) $input['limited_color'] : '' ) ?: '#fce3a8';
 		$out['booked_color']  = sanitize_hex_color( isset( $input['booked_color'] )  ? (string) $input['booked_color']  : '' ) ?: '#f6b9a3';
-		// Time zone: '' means "use the WordPress site timezone" (the Site default
-		// dropdown option). Otherwise it must be a real IANA identifier; an
-		// unrecognized value keeps the previous setting and tells the admin (WP-3).
-		$tz = isset( $input['timezone'] ) ? sanitize_text_field( (string) $input['timezone'] ) : '';
-		if ( '' === $tz || in_array( $tz, timezone_identifiers_list(), true ) ) {
-			$out['timezone'] = $tz;
-		} else {
-			$prev            = (string) ( $existing['timezone'] ?? '' );
-			$out['timezone'] = in_array( $prev, timezone_identifiers_list(), true ) ? $prev : '';
-			add_settings_error(
-				OPTION_KEY,
-				'shootcal_invalid_timezone',
-				__( 'That time zone was not recognized, so the previous setting was kept.', 'shootcal-web-calendar' )
-			);
-		}
+		// The calendar's display timezone follows WordPress (Settings > General);
+		// there is no plugin timezone setting. A per-embed timezone="..." attribute
+		// can still override it on a specific shortcode/block.
 
 		return $out;
 	}
@@ -172,18 +156,6 @@ class Settings {
 		echo '<p class="description">' . esc_html__( 'Cells render at 80% of this color by default and animate to 100% on hover. Same 80/100 pattern as Limited.', 'shootcal-web-calendar' ) . '</p>';
 	}
 
-	public function field_timezone(): void {
-		$opts    = self::get_options();
-		$current = (string) $opts['timezone'];
-		echo '<select name="' . esc_attr( OPTION_KEY ) . '[timezone]" id="timezone">';
-		echo '<option value="">' . esc_html__( 'Site default (your WordPress timezone)', 'shootcal-web-calendar' ) . '</option>';
-		// wp_timezone_choice() returns escaped <option> markup, grouped by region -
-		// the same picker WordPress uses on Settings > General.
-		echo wp_timezone_choice( $current ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core returns escaped option markup.
-		echo '</select>';
-		echo '<p class="description">' . esc_html__( 'Display timezone for the calendar. Leave on "Site default" to follow your WordPress timezone (Settings > General). A shortcode or block can override this, and ShootCal feeds auto-detect their own.', 'shootcal-web-calendar' ) . '</p>';
-	}
-
 	public function field_ajax_render(): void {
 		$opts = self::get_options();
 		printf(
@@ -216,6 +188,7 @@ class Settings {
 					?></li>
 					<li><?php esc_html_e( 'Shortcode: use the generator below to build a shortcode, then paste it into a Shortcode block. This is just an option - the block above does the same thing.', 'shootcal-web-calendar' ); ?></li>
 				</ol>
+				<p><strong><?php esc_html_e( 'Timezone:', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'the calendar displays in your site\'s timezone. Make sure it is set under Settings > General > Timezone (pick a city such as New York, not a manual UTC offset). ShootCal feeds carry their own timezone, and any embed can override it with a timezone attribute.', 'shootcal-web-calendar' ); ?></p>
 				<p><strong><?php esc_html_e( 'Best paired with the ShootCal app.', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'Any iCal (.ics) feed works here, but Availability mode is built for the ShootCal Mac app. ShootCal publishes a privacy-safe feed that hides your personal event details, builds each day\'s available / limited / booked status from your session types, and tells the plugin your timezone and how many months to show - automatically.', 'shootcal-web-calendar' ); ?></p>
 				<p><?php
 					/* translators: %s: the path within the ShootCal app's settings. */
@@ -255,7 +228,7 @@ class Settings {
 					<th scope="row"><?php esc_html_e( 'Bookings per day', 'shootcal-web-calendar' ); ?></th>
 					<td>
 						<label><input type="checkbox" id="shootcal-gen-msd" checked /> <?php esc_html_e( 'I can take more than one booking per day', 'shootcal-web-calendar' ); ?></label>
-						<p class="description"><?php esc_html_e( 'Availability mode only. This decides how a day with one or more timed sessions (and no all-day event) looks to visitors. Checked: that day shows "Limited" (gold) - partly booked, but you still have open time, so visitors know they can ask. Unchecked: the first booking marks the whole day "Booked" (coral), like an all-day commitment.', 'shootcal-web-calendar' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Availability mode only. This decides how a day with one or more timed sessions (and no all-day event) looks to visitors. Checked: that day shows as "Limited" - partly booked, but you still have open time, so visitors know they can ask. Unchecked: the first booking marks the whole day "Booked", like an all-day commitment.', 'shootcal-web-calendar' ); ?></p>
 					</td>
 				</tr>
 				<tr>

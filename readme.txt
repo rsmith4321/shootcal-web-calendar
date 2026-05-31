@@ -42,7 +42,7 @@ The feed URL lives in the shortcode or block where you use it - treat it like a 
 * Month grid showing up to 36 months ahead, with previous / today / next navigation and keyboard arrows
 * Available / Limited / Booked status per day, with booked time windows shown on Limited days and a color legend
 * Tap-to-expand booking times, plus a tap indicator on phones
-* Configurable Limited / Booked colors, Sunday or Monday week start, and display timezone
+* Configurable Limited / Booked colors and Sunday or Monday week start (the display timezone follows your WordPress site setting)
 * Optional "Page caching" mode that loads the calendar via JavaScript so it stays fresh behind Varnish or page-cache plugins
 * Privacy-first, accessible markup (ARIA grid, keyboard nav, AA contrast), and assets that load only on pages that use the calendar
 
@@ -84,7 +84,7 @@ The feed is cached for 10 minutes. You can force an immediate refresh from the s
 * `multi_session_day` - availability mode only. "1" (default): a day with only timed sessions shows as "Limited". "0": any event marks the whole day "Booked".
 * `months` - how many months to display (1-36). Default: setting value (auto-detected for ShootCal feeds).
 * `first_day` - "0" for Sunday, "1" for Monday. Default: setting value.
-* `timezone` - IANA timezone for display. Default: setting value (auto-detected for ShootCal feeds).
+* `timezone` - IANA timezone override for this embed. Default: your WordPress site timezone (or, for a ShootCal feed, the feed's own).
 
 Example: `[shootcal_web_calendar mode="full" url="https://example.com/feed.ics" months="3"]`
 

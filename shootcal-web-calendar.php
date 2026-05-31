@@ -73,8 +73,8 @@ function bootstrap(): void {
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\bootstrap' );
 
 /**
- * Activation hook: seed default options on first install. Timezone defaults to
- * '' which means "follow the WordPress site timezone" at render time.
+ * Activation hook: seed default options on first install. The display timezone
+ * follows WordPress (Settings > General); there is no timezone option here.
  */
 register_activation_hook(
 	__FILE__,
@@ -89,7 +89,6 @@ register_activation_hook(
 				'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
 				'limited_color'      => '#fce3a8',           // base color for Limited cells (rendered at 0.8 opacity)
 				'booked_color'       => '#f6b9a3',           // base color for Booked cells (rendered at 0.8 opacity)
-				'timezone'           => '',                  // '' = follow the WordPress site timezone
 				'ajax_render'        => false,               // Page caching mode off by default
 			)
 		);

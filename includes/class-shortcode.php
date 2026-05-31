@@ -180,19 +180,15 @@ class Shortcode {
 			return $this->render_admin_notice( $ical->get_error_message() );
 		}
 
-		// Resolve display timezone.
-		// Priority order:
-		//   1. `timezone` shortcode attribute (manual override, highest priority)
-		//   2. For ShootCal source: X-WR-TIMEZONE from the feed itself
-		//   3. The plugin's saved `timezone` setting
-		//   4. WordPress general timezone setting
-		// This means a ShootCal user with an EDT app gets EDT in the plugin even
-		// if their WordPress site is on UTC defaults - no manual setup needed.
+		// Resolve display timezone. Priority:
+		//   1. `timezone` shortcode/block attribute (explicit per-embed override)
+		//   2. ShootCal source: X-WR-TIMEZONE from the feed itself
+		//   3. The WordPress site timezone (Settings > General)
+		// The plugin has no timezone setting of its own - it follows WordPress.
 		$tz = $this->resolve_timezone(
 			(string) $atts['timezone'],
 			$source,
-			$ical,
-			(string) $opts['timezone']
+			$ical
 		);
 
 		// --- Rendered-output cache (the "rate limit" for the AJAX / uncached path) ---
@@ -500,8 +496,8 @@ class Shortcode {
 	 * Resolve the display timezone. Returns a DateTimeZone; never throws.
 	 * See render() for the priority order.
 	 */
-	private function resolve_timezone( string $attr_tz, string $source, string $ical, string $settings_tz ): \DateTimeZone {
-		// 1. Shortcode attribute - highest priority manual override.
+	private function resolve_timezone( string $attr_tz, string $source, string $ical ): \DateTimeZone {
+		// 1. `timezone` shortcode/block attribute - explicit per-embed override.
 		if ( $attr_tz !== '' ) {
 			$tz = $this->try_tz( $attr_tz );
 			if ( $tz !== null ) {
@@ -511,7 +507,7 @@ class Shortcode {
 
 		// 2. For ShootCal source, pull X-WR-TIMEZONE from the feed itself.
 		// (Not done for Google source - Google calendars embed VTIMEZONE blocks
-		// which are more involved and the user's WP setting is the right anchor.)
+		// which are more involved and the WordPress site timezone is the right anchor.)
 		if ( 'shootcal' === $source ) {
 			$feed_tz = $this->extract_feed_timezone( $ical );
 			if ( $feed_tz !== '' ) {
@@ -522,16 +518,8 @@ class Shortcode {
 			}
 		}
 
-		// 3. Saved plugin setting (only meaningful for Google source after the UI
-		// hides the field for ShootCal; for ShootCal it'll usually be the wp default).
-		if ( $settings_tz !== '' ) {
-			$tz = $this->try_tz( $settings_tz );
-			if ( $tz !== null ) {
-				return $tz;
-			}
-		}
-
-		// 4. Final fallback.
+		// 3. The WordPress site timezone (Settings > General). The plugin has no
+		// timezone setting of its own - it always follows WordPress.
 		return wp_timezone();
 	}
 
