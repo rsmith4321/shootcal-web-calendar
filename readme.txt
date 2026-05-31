@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.0.0
+Stable tag: 2.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,12 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.0.1 =
+* Availability colors are now set per calendar, in the block and the shortcode generator, instead of one site-wide setting. Each embed can have its own Limited and Booked colors; leave them at the defaults for the built-in look.
+* The display timezone now always follows your WordPress site timezone (Settings > General). The plugin's own timezone setting has been removed, which also fixes a case where that field could reset to "Select a city". You can still override the timezone per embed with the timezone attribute.
+* "Months to show" now defaults to 12 (was 3). ShootCal feeds still auto-detect their range from the feed.
+* Housekeeping: removed leftover migration code from the 2.0.0 rename.
 
 = 2.0.0 =
 * Renamed to ShootCal Web Calendar - it now shows any iCal calendar, not just availability. Because the plugin folder changed, WordPress treats this as a new plugin: after installing, activate "ShootCal Web Calendar" and update your embeds to the new [shootcal_web_calendar] shortcode. Your display settings carry over automatically.
