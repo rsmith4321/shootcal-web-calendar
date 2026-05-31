@@ -62,7 +62,7 @@ class Settings {
 
 	public static function get_options(): array {
 		$defaults = array(
-			'months_ahead'      => 3,
+			'months_ahead'      => 12,
 			'first_day_of_week' => 0,
 			'ajax_render'       => false,
 		);
@@ -80,7 +80,7 @@ class Settings {
 		// shortcode/block, not in Settings.
 		unset( $out['source'], $out['ical_url'], $out['shootcal_feed_url'], $out['calendar_url'], $out['limited_color'], $out['booked_color'] );
 
-		$out['months_ahead']      = isset( $input['months_ahead'] ) ? max( 1, min( 36, (int) $input['months_ahead'] ) ) : 3;
+		$out['months_ahead']      = isset( $input['months_ahead'] ) ? max( 1, min( 36, (int) $input['months_ahead'] ) ) : 12;
 		$out['first_day_of_week'] = isset( $input['first_day_of_week'] ) ? ( 1 === (int) $input['first_day_of_week'] ? 1 : 0 ) : 0;
 		$out['ajax_render']       = ! empty( $input['ajax_render'] );
 		// The calendar's display timezone follows WordPress (Settings > General);
@@ -211,7 +211,7 @@ class Settings {
 				<tr>
 					<th scope="row"><label for="shootcal-gen-months"><?php esc_html_e( 'Months to show', 'shootcal-web-calendar' ); ?></label></th>
 					<td>
-						<input type="number" id="shootcal-gen-months" class="small-text" min="1" max="36" placeholder="3" />
+						<input type="number" id="shootcal-gen-months" class="small-text" min="1" max="36" placeholder="12" />
 						<span class="description"><?php esc_html_e( 'Optional. Leave blank for the default (ShootCal feeds auto-detect).', 'shootcal-web-calendar' ); ?></span>
 					</td>
 				</tr>

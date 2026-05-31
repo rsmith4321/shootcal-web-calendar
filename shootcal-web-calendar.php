@@ -85,7 +85,7 @@ register_activation_hook(
 		add_option(
 			OPTION_KEY,
 			array(
-				'months_ahead'       => 3,
+				'months_ahead'       => 12,
 				'first_day_of_week'  => 0,                   // 0=Sunday, 1=Monday
 				'ajax_render'        => false,               // Page caching mode off by default
 			)
