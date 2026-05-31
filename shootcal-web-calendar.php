@@ -73,9 +73,8 @@ function bootstrap(): void {
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\bootstrap' );
 
 /**
- * Activation hook: ensure default options exist, carrying over settings from the
- * pre-2.0 "ShootCal Availability" plugin if present (the slug rename makes WP see
- * this as a new plugin, so options don't transfer automatically).
+ * Activation hook: seed default options on first install. Timezone defaults to
+ * '' which means "follow the WordPress site timezone" at render time.
  */
 register_activation_hook(
 	__FILE__,
@@ -83,16 +82,6 @@ register_activation_hook(
 		if ( false !== get_option( OPTION_KEY ) ) {
 			return;
 		}
-
-		// Migrate display settings from the old plugin slug. Drop the removed
-		// single-URL keys - feed URLs now live on each shortcode/block.
-		$legacy = get_option( 'shootcal_availability_options' );
-		if ( is_array( $legacy ) ) {
-			unset( $legacy['calendar_url'], $legacy['source'], $legacy['ical_url'], $legacy['shootcal_feed_url'] );
-			add_option( OPTION_KEY, $legacy );
-			return;
-		}
-
 		add_option(
 			OPTION_KEY,
 			array(
