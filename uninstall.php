@@ -11,6 +11,8 @@ delete_option( 'shootcal_web_calendar_options' );
 delete_option( 'shootcal_web_calendar_cache_ver' );
 delete_transient( 'shootcal_web_calendar_ical' );
 
-// Clean up the cached release check left behind by pre-1.0 builds distributed
-// outside the WordPress.org directory. Harmless no-op on sites that never had it.
+// Clean up the cached release check left behind by the self-updater that
+// earlier builds (distributed outside the WordPress.org directory) shipped.
+// Updates now come only from the directory; harmless no-op on sites that
+// never ran that updater.
 delete_site_transient( 'shootcal_web_calendar_github_release' );
