@@ -105,9 +105,11 @@ class Shortcode {
 	 */
 	public function handle_ajax_render(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- authenticated by the HMAC signature below, not a nonce.
-		// Mirror the emit-side normalization (render()) exactly so the HMAC
-		// over $url matches; esc_url_raw also satisfies input sanitization.
-		$url       = isset( $_POST['url'] ) ? esc_url_raw( trim( html_entity_decode( (string) wp_unslash( $_POST['url'] ), ENT_QUOTES ) ) ) : '';
+		// The posted URL is the exact value render() already normalized
+		// (esc_url_raw + trim) and echoed into the embed, so re-running
+		// esc_url_raw here is idempotent - it keeps the HMAC match AND is the
+		// canonical sanitize-wraps-unslash form the input sniff recognizes.
+		$url       = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
 		$mode      = ( isset( $_POST['mode'] ) && 'full' === $_POST['mode'] ) ? 'full' : 'availability';
 		$months    = ( isset( $_POST['months'] ) && (int) $_POST['months'] > 0 ) ? (string) min( 36, (int) $_POST['months'] ) : '';
 		$first_day = ( isset( $_POST['first_day'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['first_day'] ) ) ) ? '1' : '0';
