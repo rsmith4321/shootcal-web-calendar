@@ -185,14 +185,23 @@
 		/* Gentle scale/fade so it eases open rather than snapping in. */
 		animation: shootcal-lazy-expand 0.4s cubic-bezier( 0.22, 0.61, 0.36, 1 ) both;
 	}
+	/* Inline-SVG spinner: a faint full track ring plus a rounded-cap accent
+	 * arc (~70% of the circle) that sweeps around. Reads as a proper spinner
+	 * rather than the lone half-arc a single-bordered circle produced. */
 	.shootcal-web-calendar__loader {
 		width: 40px;
 		height: 40px;
-		border-radius: 50%;
-		/* Track in the grid-line gray, with one arc in the sunset accent. */
-		border: 3px solid var(--shootcal-grid-line);
-		border-top-color: var(--shootcal-sunset-vivid);
-		animation: shootcal-spin 0.8s linear infinite;
+		transform-origin: center;
+		animation: shootcal-spin 0.9s linear infinite;
+	}
+	.shootcal-web-calendar__loader-track {
+		stroke: var(--shootcal-grid-line);
+		opacity: 0.5;
+	}
+	.shootcal-web-calendar__loader-arc {
+		stroke: var(--shootcal-sunset-vivid);
+		/* Circumference = 2 * pi * r(20) ~= 125.7; ~90 drawn leaves a ~29% gap. */
+		stroke-dasharray: 90 126;
 	}
 	.shootcal-web-calendar__lazy-msg {
 		margin: 0;

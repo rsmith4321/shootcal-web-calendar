@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.1.3
+Stable tag: 2.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.1.4 =
+* Nicer loading spinner in Page caching mode: replaced the CSS-border spinner (which could look like a lone half-circle) with a crisp inline-SVG ring and a rounded sweeping arc in the sunset accent.
 
 = 2.1.3 =
 * Simplified the "Remove Unused CSS" note (Page caching mode): it now tells you to add the single path `/shootcal-web-calendar/` to your optimizer's stylesheet exclusion list, which is the format Perfmatters and WP Rocket expect, and reminds you to clear/regenerate the used CSS and page cache afterward.
