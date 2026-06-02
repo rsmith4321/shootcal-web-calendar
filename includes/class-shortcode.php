@@ -92,10 +92,6 @@ class Shortcode {
 		$data .= ' data-shootcal-sig="' . esc_attr( $sig ) . '"';
 
 		return '<div class="shootcal-web-calendar__wrap shootcal-web-calendar__lazy" data-shootcal-lazy' . $data . '>'
-			. '<svg class="shootcal-web-calendar__loader" viewBox="0 0 50 50" width="40" height="40" aria-hidden="true" focusable="false">'
-				. '<circle class="shootcal-web-calendar__loader-track" cx="25" cy="25" r="20" fill="none" stroke-width="5" />'
-				. '<circle class="shootcal-web-calendar__loader-arc" cx="25" cy="25" r="20" fill="none" stroke-width="5" stroke-linecap="round" />'
-			. '</svg>'
 			. '<p class="shootcal-web-calendar__lazy-msg">' . esc_html__( 'Loading calendar…', 'shootcal-web-calendar' ) . '</p>'
 			. '</div>';
 	}

@@ -3,7 +3,7 @@
  * Plugin Name:       ShootCal Web Calendar
  * Plugin URI:        https://shootcal.com
  * Description:       Embed an iCal calendar on your site as a month grid - free/busy availability (no event details) or a full calendar with event titles and times. Per-embed feed URL via shortcode or block.
- * Version:           2.1.5
+ * Version:           2.1.6
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Ryan Smith
@@ -22,7 +22,7 @@ namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '2.1.5';
+const VERSION     = '2.1.6';
 const SLUG        = 'shootcal-web-calendar';
 const OPTION_KEY  = 'shootcal_web_calendar_options';
 const CACHE_KEY   = 'shootcal_web_calendar_ical';

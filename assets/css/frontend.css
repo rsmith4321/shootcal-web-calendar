@@ -185,36 +185,13 @@
 		/* Gentle scale/fade so it eases open rather than snapping in. */
 		animation: shootcal-lazy-expand 0.4s cubic-bezier( 0.22, 0.61, 0.36, 1 ) both;
 	}
-	/* Inline-SVG spinner: a faint full track ring plus a rounded-cap accent
-	 * arc (~70% of the circle) that sweeps around. Reads as a proper spinner
-	 * rather than the lone half-arc a single-bordered circle produced. */
-	.shootcal-web-calendar__loader {
-		width: 40px;
-		height: 40px;
-		transform-origin: center;
-		animation: shootcal-spin 0.9s linear infinite;
-	}
-	.shootcal-web-calendar__loader-track {
-		stroke: var(--shootcal-grid-line);
-		opacity: 0.5;
-	}
-	.shootcal-web-calendar__loader-arc {
-		stroke: var(--shootcal-sunset-vivid);
-		/* Circumference = 2 * pi * r(20) ~= 125.7; ~90 drawn leaves a ~29% gap. */
-		stroke-dasharray: 90 126;
-	}
+	/* Plain "Loading calendar…" text - no spinner. The swap-in is near-instant,
+	 * and a spinner could be restyled into a strange shape by some themes /
+	 * CSS optimizers, so the placeholder stays as simple centered text. */
 	.shootcal-web-calendar__lazy-msg {
 		margin: 0;
 		color: var(--shootcal-muted);
-		font-size: 0.85rem;
-	}
-	/* Failed fetch: stop the spinner so it doesn't spin forever; the JS
-	 * swaps the message to an error string and adds this class. */
-	.shootcal-web-calendar__lazy.is-error .shootcal-web-calendar__loader {
-		display: none;
-	}
-	@keyframes shootcal-spin {
-		to { transform: rotate( 360deg ); }
+		font-size: 0.95rem;
 	}
 	@keyframes shootcal-lazy-expand {
 		from { opacity: 0; transform: scale( 0.96 ); }
@@ -222,7 +199,6 @@
 	}
 	@media ( prefers-reduced-motion: reduce ) {
 		.shootcal-web-calendar__lazy { animation: none; }
-		.shootcal-web-calendar__loader { animation-duration: 1.6s; }
 	}
 
 	/* --- Toolbar (Month Year | < Today >) --- */
