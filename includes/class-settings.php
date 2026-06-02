@@ -134,6 +134,25 @@ class Settings {
 		echo '<p class="description">';
 		esc_html_e( 'Turn this on if your site uses full-page caching (e.g. Varnish or a page-cache plugin). The page itself stays cached, but the calendar is fetched fresh on each visit, so availability never gets stuck behind a long page cache. Leave off otherwise.', 'shootcal-web-calendar' );
 		echo '</p>';
+
+		// Used-CSS optimizers (Perfmatters, WP Rocket, etc.) scan the page
+		// HTML to decide which CSS to keep. In this mode the calendar is
+		// injected by JavaScript AFTER the page loads, so its styles aren't
+		// in the scanned HTML and can get stripped, leaving the calendar
+		// unstyled. Surface the fix right where the mode is enabled.
+		if ( ! empty( $opts['ajax_render'] ) ) {
+			echo '<div class="notice notice-warning inline" style="margin:10px 0 0;"><p style="margin:.5em 0;">';
+			echo '<strong>' . esc_html__( 'Using a "Remove Unused CSS" optimizer?', 'shootcal-web-calendar' ) . '</strong><br />';
+			printf(
+				/* translators: 1: the CSS handle, 2: the stylesheet path. */
+				esc_html__( 'If you use Perfmatters, WP Rocket, or another tool that removes unused CSS, exclude this plugin\'s stylesheet from it. In this mode the calendar loads via JavaScript, so the optimizer doesn\'t see its styles in the page HTML and may strip them, leaving the calendar unstyled. Add the handle %1$s (or the file %2$s) to the optimizer\'s CSS exclusion / safelist.', 'shootcal-web-calendar' ),
+				'<code>shootcal-web-calendar</code>',
+				'<code>/wp-content/plugins/shootcal-web-calendar/assets/css/frontend.css</code>'
+			);
+			echo '<br />';
+			echo esc_html__( 'Perfmatters: Options > Assets > Used CSS > Stylesheet Exclusions. WP Rocket: File Optimization > Reduce Unused CSS > CSS Safelist.', 'shootcal-web-calendar' );
+			echo '</p></div>';
+		}
 	}
 
 	public function field_show_credit(): void {
