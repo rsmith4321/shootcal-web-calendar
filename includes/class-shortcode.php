@@ -512,7 +512,9 @@ class Shortcode {
 	}
 
 	private function credit_html( string $source ): string {
-		if ( 'shootcal' !== $source ) {
+		// Only ShootCal feeds carry the credit, and only when the site owner
+		// hasn't switched it off (Settings > ShootCal Web Calendar).
+		if ( 'shootcal' !== $source || empty( Settings::get_options()['show_credit'] ) ) {
 			return '';
 		}
 		$link = sprintf(

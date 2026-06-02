@@ -58,6 +58,8 @@ class Settings {
 		// availability mode only) - no site-wide color setting here.
 		add_settings_field( 'ajax_render', __( 'Page caching', 'shootcal-web-calendar' ),
 			array( $this, 'field_ajax_render' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
+		add_settings_field( 'show_credit', __( 'ShootCal credit', 'shootcal-web-calendar' ),
+			array( $this, 'field_show_credit' ), self::PAGE_SLUG, self::SECTION_DISPLAY );
 	}
 
 	public static function get_options(): array {
@@ -65,6 +67,7 @@ class Settings {
 			'months_ahead'      => 12,
 			'first_day_of_week' => 0,
 			'ajax_render'       => false,
+			'show_credit'       => true,
 		);
 
 		$options = get_option( OPTION_KEY, array() );
@@ -83,6 +86,7 @@ class Settings {
 		$out['months_ahead']      = isset( $input['months_ahead'] ) ? max( 1, min( 36, (int) $input['months_ahead'] ) ) : 12;
 		$out['first_day_of_week'] = isset( $input['first_day_of_week'] ) ? ( 1 === (int) $input['first_day_of_week'] ? 1 : 0 ) : 0;
 		$out['ajax_render']       = ! empty( $input['ajax_render'] );
+		$out['show_credit']       = ! empty( $input['show_credit'] );
 		// The calendar's display timezone follows WordPress (Settings > General);
 		// there is no plugin timezone setting. A per-embed timezone="..." attribute
 		// can still override it on a specific shortcode/block. Cell colors are also
@@ -129,6 +133,19 @@ class Settings {
 		);
 		echo '<p class="description">';
 		esc_html_e( 'Turn this on if your site uses full-page caching (e.g. Varnish or a page-cache plugin). The page itself stays cached, but the calendar is fetched fresh on each visit, so availability never gets stuck behind a long page cache. Leave off otherwise.', 'shootcal-web-calendar' );
+		echo '</p>';
+	}
+
+	public function field_show_credit(): void {
+		$opts = self::get_options();
+		printf(
+			'<label><input type="checkbox" name="%1$s[show_credit]" id="show_credit" value="1"%2$s /> %3$s</label>',
+			esc_attr( OPTION_KEY ),
+			checked( ! empty( $opts['show_credit'] ), true, false ),
+			esc_html__( 'Show a small "Calendar provided by ShootCal" line below the calendar.', 'shootcal-web-calendar' )
+		);
+		echo '<p class="description">';
+		esc_html_e( 'Only appears on calendars using a ShootCal feed. Turn it off to hide the credit. Keeping it on is appreciated but never required.', 'shootcal-web-calendar' );
 		echo '</p>';
 	}
 
