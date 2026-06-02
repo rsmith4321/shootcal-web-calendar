@@ -218,6 +218,19 @@
 	 * here we fetch the freshly-rendered calendar from admin-ajax (which the page
 	 * cache doesn't store) and swap it in. The delegated click/keydown handlers
 	 * above then work on the injected markup without any re-binding. */
+	/* Failed page-caching fetch: drop the lazy flag, stop the spinner (via the
+	 * is-error class), and replace "Loading…" with a localized error message
+	 * so the placeholder doesn't sit there spinning forever. */
+	function showLazyError( box ) {
+		box.removeAttribute( 'data-shootcal-lazy' );
+		box.classList.add( 'is-error' );
+		var msg = box.querySelector( '.shootcal-web-calendar__lazy-msg' );
+		var txt = window.ShootCalWebCalendarFront && window.ShootCalWebCalendarFront.errorText;
+		if ( msg && txt ) {
+			msg.textContent = txt;
+		}
+	}
+
 	function hydrateLazy() {
 		if ( typeof window.ShootCalWebCalendarFront === 'undefined' ) return;
 		var boxes = document.querySelectorAll( '.shootcal-web-calendar__lazy[data-shootcal-lazy]' );
@@ -245,10 +258,10 @@
 				if ( html ) {
 					box.outerHTML = html;
 				} else {
-					box.removeAttribute( 'data-shootcal-lazy' );
+					showLazyError( box );
 				}
 			} ).catch( function () {
-				box.removeAttribute( 'data-shootcal-lazy' );
+				showLazyError( box );
 			} );
 		} );
 	}

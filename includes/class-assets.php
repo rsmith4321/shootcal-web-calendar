@@ -38,7 +38,10 @@ class Assets {
 		wp_localize_script(
 			'shootcal-web-calendar',
 			'ShootCalWebCalendarFront',
-			array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ) )
+			array(
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'errorText' => __( 'The calendar could not be loaded.', 'shootcal-web-calendar' ),
+			)
 		);
 	}
 
