@@ -205,7 +205,7 @@ class Settings {
 					<th scope="row"><label for="shootcal-gen-booked-color"><?php esc_html_e( 'Booked day color', 'shootcal-web-calendar' ); ?></label></th>
 					<td>
 						<input type="color" id="shootcal-gen-booked-color" value="#f6b9a3" />
-						<p class="description"><?php esc_html_e( 'Availability mode only. Shading for a fully "Booked" day. Same 80% / 100%-on-hover treatment. Leave at the default to use the built-in soft coral.', 'shootcal-web-calendar' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Availability mode only. Shading for a fully "Booked" day, shown at reduced opacity at rest and full strength on hover. Leave at the default to use the built-in soft coral.', 'shootcal-web-calendar' ); ?></p>
 					</td>
 				</tr>
 				<tr>

@@ -293,8 +293,8 @@ class Month_Grid {
 
 		$time_format = (string) get_option( 'time_format', 'g:i a' );
 
-		/* translators: 1: booked window start time, 2: booked window end time. */
 		return sprintf(
+			/* translators: 1: booked window start time, 2: booked window end time. */
 			__( 'Booked %1$s - %2$s', 'shootcal-web-calendar' ),
 			wp_date( $time_format, $start->getTimestamp(), $tz ),
 			wp_date( $time_format, $end->getTimestamp(), $tz )

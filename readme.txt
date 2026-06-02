@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.0.2
+Stable tag: 2.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.0.3 =
+* Compliance and code-quality pass for the WordPress.org Plugin Directory: added translators comments to two strings with placeholders, reworded a settings description so it no longer reads as a format placeholder, hardened the page-caching AJAX endpoint to fully sanitize its inputs (the request was already HMAC-verified), and removed the manual translation loader (WordPress loads directory translations automatically). No change to how the calendar looks or works.
 
 = 2.0.2 =
 * Compliance: the per-embed availability colors are now applied through an inline style attribute (CSS custom properties) on the calendar element instead of a `<style>` block, so the plugin no longer prints any inline `<style>`/`<script>` tags. No visual change.

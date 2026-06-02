@@ -105,15 +105,17 @@ class Shortcode {
 	 */
 	public function handle_ajax_render(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- authenticated by the HMAC signature below, not a nonce.
-		$url       = isset( $_POST['url'] ) ? trim( (string) wp_unslash( $_POST['url'] ) ) : '';
+		// Mirror the emit-side normalization (render()) exactly so the HMAC
+		// over $url matches; esc_url_raw also satisfies input sanitization.
+		$url       = isset( $_POST['url'] ) ? esc_url_raw( trim( html_entity_decode( (string) wp_unslash( $_POST['url'] ), ENT_QUOTES ) ) ) : '';
 		$mode      = ( isset( $_POST['mode'] ) && 'full' === $_POST['mode'] ) ? 'full' : 'availability';
 		$months    = ( isset( $_POST['months'] ) && (int) $_POST['months'] > 0 ) ? (string) min( 36, (int) $_POST['months'] ) : '';
-		$first_day = ( isset( $_POST['first_day'] ) && '1' === (string) $_POST['first_day'] ) ? '1' : '0';
+		$first_day = ( isset( $_POST['first_day'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['first_day'] ) ) ) ? '1' : '0';
 		$timezone  = isset( $_POST['timezone'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['timezone'] ) ) : '';
-		$msd       = ( isset( $_POST['msd'] ) && '0' === (string) $_POST['msd'] ) ? '0' : '1';
+		$msd       = ( isset( $_POST['msd'] ) && '0' === sanitize_text_field( wp_unslash( $_POST['msd'] ) ) ) ? '0' : '1';
 		$limited   = isset( $_POST['limited_color'] ) ? (string) sanitize_hex_color( (string) wp_unslash( $_POST['limited_color'] ) ) : '';
 		$booked    = isset( $_POST['booked_color'] )  ? (string) sanitize_hex_color( (string) wp_unslash( $_POST['booked_color'] ) )  : '';
-		$sig       = isset( $_POST['sig'] ) ? (string) wp_unslash( $_POST['sig'] ) : '';
+		$sig       = isset( $_POST['sig'] ) ? sanitize_text_field( wp_unslash( $_POST['sig'] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$expected = self::signature( $url, $mode, $months, $first_day, $timezone, $msd, $limited, $booked );
