@@ -144,13 +144,12 @@ class Settings {
 			echo '<div class="notice notice-warning inline" style="margin:10px 0 0;"><p style="margin:.5em 0;">';
 			echo '<strong>' . esc_html__( 'Using a "Remove Unused CSS" optimizer?', 'shootcal-web-calendar' ) . '</strong><br />';
 			printf(
-				/* translators: 1: the CSS handle, 2: the stylesheet path. */
-				esc_html__( 'If you use Perfmatters, WP Rocket, or another tool that removes unused CSS, exclude this plugin\'s stylesheet from it. In this mode the calendar loads via JavaScript, so the optimizer doesn\'t see its styles in the page HTML and may strip them, leaving the calendar unstyled. Add the handle %1$s (or the file %2$s) to the optimizer\'s CSS exclusion / safelist.', 'shootcal-web-calendar' ),
-				'<code>shootcal-web-calendar</code>',
-				'<code>/wp-content/plugins/shootcal-web-calendar/assets/css/frontend.css</code>'
+				/* translators: %s: the plugin directory path to add to the CSS exclusion list. */
+				esc_html__( 'If you use Perfmatters, WP Rocket, or another tool that removes unused CSS, add %s to its stylesheet exclusion list. In this mode the calendar loads via JavaScript, so the optimizer doesn\'t see its styles in the page HTML and may strip them, leaving the calendar unstyled.', 'shootcal-web-calendar' ),
+				'<code>/shootcal-web-calendar/</code>'
 			);
 			echo '<br />';
-			echo esc_html__( 'Perfmatters: Options > Assets > Used CSS > Stylesheet Exclusions. WP Rocket: File Optimization > Reduce Unused CSS > CSS Safelist.', 'shootcal-web-calendar' );
+			echo esc_html__( 'Perfmatters: Options > Assets > Used CSS > Excluded Stylesheets. WP Rocket: File Optimization > Reduce Unused CSS > CSS Safelist. After adding it, clear/regenerate the used CSS and your page cache.', 'shootcal-web-calendar' );
 			echo '</p></div>';
 		}
 	}
