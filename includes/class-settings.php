@@ -365,7 +365,11 @@ class Settings {
 		// so we can see what the server actually fetched. Useful when CF caches differ
 		// between data centers, or when intermediate proxies strip parts of the body.
 		$debug = array();
-		if ( 0 === (int) $events ) {
+		// Only reflect the fetched body preview + upstream headers back to the
+		// admin in debug builds. In production this turned the backend into a
+		// content-reflector for arbitrary admin-supplied URLs (defense in depth
+		// behind the existing manage_options + nonce + SSRF guards).
+		if ( 0 === (int) $events && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			$headers = wp_remote_retrieve_headers( $response );
 			$debug   = array(
 				'body_preview'    => mb_substr( $body, 0, 400 ),

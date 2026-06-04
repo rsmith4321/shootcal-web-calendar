@@ -67,6 +67,11 @@ final class Event {
 	 */
 	public function days_covered( \DateTimeZone $display_tz ): array {
 		$out = array();
+		// Hard cap on emitted day-keys (~2.7 years). The feed horizon maxes
+		// at 24 months; without this a malformed/hostile VEVENT (e.g.
+		// DTSTART 1970 / DTEND 2099) would expand to tens of thousands of
+		// iterations per event — a feed-driven CPU/memory DoS.
+		$max = 1000;
 
 		if ( $this->all_day ) {
 			$utc        = new \DateTimeZone( 'UTC' );
@@ -77,7 +82,7 @@ final class Event {
 			if ( false === $cursor || false === $last ) {
 				return array();
 			}
-			while ( $cursor < $last ) {
+			while ( $cursor < $last && count( $out ) < $max ) {
 				$out[]  = $cursor->format( 'Y-m-d' );
 				$cursor = $cursor->modify( '+1 day' );
 			}
@@ -88,7 +93,7 @@ final class Event {
 		$end_local   = $this->end->setTimezone( $display_tz );
 
 		$cursor = $start_local->setTime( 0, 0, 0 );
-		while ( $cursor < $end_local ) {
+		while ( $cursor < $end_local && count( $out ) < $max ) {
 			$out[]  = $cursor->format( 'Y-m-d' );
 			$cursor = $cursor->modify( '+1 day' );
 		}
