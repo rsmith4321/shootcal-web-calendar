@@ -8,11 +8,13 @@ Stable tag: 2.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Show a calendar on your WordPress site as a month grid: free/busy availability (no event details) or a full calendar with event titles and times.
+Companion plugin for the ShootCal app (Mac and iOS): show your availability or a full calendar on your WordPress site. Works with any iCal feed.
 
 == Description ==
 
-ShootCal Web Calendar embeds an iCal (.ics) calendar on any WordPress page or post, in one of two modes. **Availability** mode shows which days are **available**, **limited**, or **booked** without ever exposing your event titles, locations, attendees, or descriptions. **Full calendar** mode shows each event's title and time on the grid - handy for a public schedule like sunrise/sunset times, office hours, or class times.
+**ShootCal Web Calendar is the companion plugin for the ShootCal scheduling app for Mac and iOS.** Publish your availability - or a full calendar - on your website straight from the calendar you already keep in ShootCal, which hides your personal events, builds each day's availability from your session types, and auto-detects your timezone. It also works with **any** iCal (.ics) feed - Google Calendar, Apple, or Outlook - so you can use it with or without ShootCal.
+
+Add it to any WordPress page or post in one of two modes. **Availability** mode shows which days are **available**, **limited**, or **booked** without ever exposing your event titles, locations, attendees, or descriptions. **Full calendar** mode shows each event's title and time on the grid - handy for a public schedule like sunrise/sunset times, office hours, or class times.
 
 Built for photographers and other service providers who want to show clients when they can book, without manually updating a calendar on their website every week.
 
