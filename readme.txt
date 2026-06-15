@@ -4,13 +4,15 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.2.0
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Companion plugin for the ShootCal app (Mac and iOS): show your availability or a full calendar on your WordPress site. Works with any iCal feed.
 
 == Description ==
+
+**Heads-up for ShootCal app users:** you no longer need this plugin. ShootCal now gives you a ready-to-paste **embed snippet** in Settings > Booking that works in an HTML / "Embed" block on *any* website builder (WordPress, Squarespace, Wix, etc.) — it fills the space and resizes itself automatically. This plugin remains for WordPress users who prefer a shortcode/block or who want to render a generic (non-ShootCal) iCal feed as a month grid.
 
 **ShootCal Web Calendar is the companion plugin for the ShootCal scheduling app for Mac and iOS.** Publish your availability - or a full calendar - on your website straight from the calendar you already keep in ShootCal, which hides your personal events, builds each day's availability from your session types, and auto-detects your timezone. It also works with **any** iCal (.ics) feed - Google Calendar, Apple, or Outlook - so you can use it with or without ShootCal.
 
@@ -117,6 +119,10 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.3.0 =
+* ShootCal embeds now fill the full width of their container (removed the built-in max-width cap), matching the standalone embed.
+* Readme note: ShootCal app users can now paste a ready-made embed snippet from Settings > Booking into any site builder's HTML block — this plugin is optional and remains for shortcode/block users and generic iCal feeds.
 
 = 2.2.0 =
 * ShootCal feeds now render through the hosted, always-current ShootCal embed, so the calendar on your site stays identical to the one on shootcal.com and automatically gains new features — including client self-booking, where visitors can request an open date right from the calendar. Other calendar feeds (Google, Apple, Outlook) are unchanged.

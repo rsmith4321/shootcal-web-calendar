@@ -94,7 +94,7 @@ class Shortcode {
 			$src .= '?' . http_build_query( $params );
 		}
 		$id = 'scwc-' . substr( md5( $token . wp_json_encode( $params ) ), 0, 8 );
-		return '<div class="shootcal-web-calendar-embed" style="max-width:1200px;margin:0 auto">'
+		return '<div class="shootcal-web-calendar-embed" style="width:100%">'
 			. '<iframe id="' . esc_attr( $id ) . '" src="' . esc_url( $src ) . '" loading="lazy" scrolling="no"'
 			. ' title="' . esc_attr__( 'Availability calendar', 'shootcal-web-calendar' ) . '"'
 			. ' style="width:100%;border:0;display:block;min-height:520px"></iframe></div>'
