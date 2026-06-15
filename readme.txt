@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.1.6
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -117,6 +117,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.2.0 =
+* ShootCal feeds now render through the hosted, always-current ShootCal embed, so the calendar on your site stays identical to the one on shootcal.com and automatically gains new features — including client self-booking, where visitors can request an open date right from the calendar. Other calendar feeds (Google, Apple, Outlook) are unchanged.
 
 = 2.1.6 =
 * Page caching mode now shows a simple "Loading calendar…" line instead of a spinner while the calendar loads. The load is near-instant, and plain text can't be restyled into an odd shape by a theme or CSS optimizer.

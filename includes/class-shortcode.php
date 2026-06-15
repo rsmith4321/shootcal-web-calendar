@@ -30,6 +30,17 @@ class Shortcode {
 	 */
 	public function render( $atts = array() ): string {
 		$atts = is_array( $atts ) ? $atts : array();
+
+		// ShootCal feeds render through the hosted, always-current embed
+		// (api.shootcal.com/embed/<token>) so the WordPress calendar is identical
+		// to the one on shootcal.com — and inherits new features automatically,
+		// including client self-booking. Non-ShootCal feeds (Google/Apple/Outlook
+		// .ics) keep using the local renderer below.
+		$token = self::shootcal_feed_token( isset( $atts['url'] ) ? (string) $atts['url'] : '' );
+		if ( null !== $token ) {
+			return $this->render_shootcal_embed( $atts, $token );
+		}
+
 		// "Page caching" mode: emit a lightweight placeholder that JS hydrates from
 		// admin-ajax, so the page stays fully cacheable while the calendar renders
 		// fresh behind a full-page cache (e.g. Varnish). The placeholder carries the
@@ -40,6 +51,56 @@ class Shortcode {
 			return $this->render_lazy_placeholder( $atts );
 		}
 		return $this->render_calendar( $atts );
+	}
+
+	/**
+	 * If the feed URL is a ShootCal feed, return its public token; otherwise null.
+	 * Accepts both the raw feed (feed.shootcal.com/<token>.ics) and an embed URL
+	 * (api.shootcal.com/embed/<token>).
+	 */
+	private static function shootcal_feed_token( string $url ): ?string {
+		$url = trim( $url );
+		if ( '' === $url ) {
+			return null;
+		}
+		if ( preg_match( '#^https?://feed\.shootcal\.com/([A-Za-z0-9_-]{8,128})\.ics#i', $url, $m ) ) {
+			return $m[1];
+		}
+		if ( preg_match( '#^https?://api\.shootcal\.com/embed/([A-Za-z0-9_-]{8,128})#i', $url, $m ) ) {
+			return $m[1];
+		}
+		return null;
+	}
+
+	/**
+	 * Wrapper output for ShootCal feeds: an <iframe> of the hosted embed that
+	 * auto-sizes to its content (the embed posts its height via postMessage).
+	 * Passes through the months / mode / first_day display options.
+	 */
+	private function render_shootcal_embed( array $atts, string $token ): string {
+		$params = array();
+		$months = isset( $atts['months'] ) ? (int) $atts['months'] : 0;
+		if ( $months > 0 ) {
+			$params['months'] = $months;
+		}
+		if ( isset( $atts['mode'] ) && 'full' === $atts['mode'] ) {
+			$params['mode'] = 'full';
+		}
+		if ( isset( $atts['first_day'] ) && '1' === (string) $atts['first_day'] ) {
+			$params['first_day'] = '1';
+		}
+		$src = 'https://api.shootcal.com/embed/' . rawurlencode( $token );
+		if ( $params ) {
+			$src .= '?' . http_build_query( $params );
+		}
+		$id = 'scwc-' . substr( md5( $token . wp_json_encode( $params ) ), 0, 8 );
+		return '<div class="shootcal-web-calendar-embed" style="max-width:1200px;margin:0 auto">'
+			. '<iframe id="' . esc_attr( $id ) . '" src="' . esc_url( $src ) . '" loading="lazy" scrolling="no"'
+			. ' title="' . esc_attr__( 'Availability calendar', 'shootcal-web-calendar' ) . '"'
+			. ' style="width:100%;border:0;display:block;min-height:520px"></iframe></div>'
+			. '<script>(function(){var f=document.getElementById(' . wp_json_encode( $id ) . ');if(!f)return;'
+			. 'window.addEventListener("message",function(e){if(f.contentWindow&&e.source!==f.contentWindow)return;'
+			. 'var d=e.data;if(d&&d.shootcalEmbed&&d.height)f.style.height=Math.max(360,d.height)+"px";});})();</script>';
 	}
 
 	/**
