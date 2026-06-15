@@ -12,7 +12,7 @@ Companion plugin for the ShootCal app (Mac and iOS): show your availability or a
 
 == Description ==
 
-**Heads-up for ShootCal app users:** you no longer need this plugin. ShootCal now gives you a ready-to-paste **embed snippet** in Settings > Booking that works in an HTML / "Embed" block on *any* website builder (WordPress, Squarespace, Wix, etc.) — it fills the space and resizes itself automatically. This plugin remains for WordPress users who prefer a shortcode/block or who want to render a generic (non-ShootCal) iCal feed as a month grid.
+**Two easy ways to embed your calendar.** The simplest: paste the ready-made **embed snippet** from ShootCal (Settings > Booking) into an HTML / "Embed" block — it works on WordPress and every other builder, fills the space, and resizes itself. Or use **this plugin's** shortcode/block for WordPress-native convenience — it does everything the snippet does *and* can render any generic iCal feed (Google, Apple, Outlook) as a clean month grid. Pick whichever you prefer.
 
 **ShootCal Web Calendar is the companion plugin for the ShootCal scheduling app for Mac and iOS.** Publish your availability - or a full calendar - on your website straight from the calendar you already keep in ShootCal, which hides your personal events, builds each day's availability from your session types, and auto-detects your timezone. It also works with **any** iCal (.ics) feed - Google Calendar, Apple, or Outlook - so you can use it with or without ShootCal.
 
