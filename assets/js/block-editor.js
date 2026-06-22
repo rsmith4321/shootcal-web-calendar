@@ -27,6 +27,15 @@
 	var ToggleControl     = wp.components.ToggleControl;
 	var __                = wp.i18n.__;
 
+	// Let people paste exactly what ShootCal hands them: if a full <iframe ...>
+	// snippet is pasted, lift the src URL out so we store a clean URL. A bare URL
+	// (ShootCal or any other iCal feed) passes through unchanged.
+	function extractEmbedUrl( v ) {
+		v = ( v || '' ).trim();
+		var m = v.match( /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i );
+		return m ? m[ 1 ].trim() : v;
+	}
+
 	registerBlockType( 'shootcal-web-calendar/calendar', {
 		edit: function ( props ) {
 			var attributes    = props.attributes;
@@ -78,12 +87,12 @@
 						}
 					} ),
 					el( TextControl, {
-						label: __( 'Calendar feed URL', 'shootcal-web-calendar' ),
-						help: __( 'Paste the iCal (.ics) feed URL to display (required). Treat it like a password.', 'shootcal-web-calendar' ),
-						type: 'url',
+						label: __( 'ShootCal embed or calendar feed', 'shootcal-web-calendar' ),
+						help: __( 'Paste your ShootCal embed - the <iframe> snippet or its URL - to show your live availability calendar (the main way). Other iCal (.ics) feeds, e.g. Google, Apple, or Outlook, also work as a URL. Treat it like a password.', 'shootcal-web-calendar' ),
+						type: 'text',
 						value: urlValue,
 						onChange: function ( v ) {
-							setAttributes( { url: ( v || '' ).trim() } );
+							setAttributes( { url: extractEmbedUrl( v ) } );
 						}
 					} ),
 					( modeValue === 'availability' ) ? el( ToggleControl, {
@@ -134,7 +143,7 @@
 			// Override summary shown under the URL field.
 			var summaryBits = [];
 			summaryBits.push( ( modeValue === 'full' ) ? __( 'Mode: Full calendar', 'shootcal-web-calendar' ) : __( 'Mode: Availability', 'shootcal-web-calendar' ) );
-			summaryBits.push( urlValue ? __( 'Feed: custom URL', 'shootcal-web-calendar' ) : __( 'Feed: Settings URL', 'shootcal-web-calendar' ) );
+			summaryBits.push( urlValue ? __( 'Source: set', 'shootcal-web-calendar' ) : __( 'Source: paste your ShootCal embed', 'shootcal-web-calendar' ) );
 			summaryBits.push( monthsValue ? __( 'Months: ', 'shootcal-web-calendar' ) + monthsValue : __( 'Months: default', 'shootcal-web-calendar' ) );
 			summaryBits.push( ( firstDayValue === '1' ) ? __( 'Week starts Monday', 'shootcal-web-calendar' ) : __( 'Week starts Sunday', 'shootcal-web-calendar' ) );
 			summaryBits.push( timezoneValue ? __( 'Timezone: ', 'shootcal-web-calendar' ) + timezoneValue : __( 'Timezone: auto', 'shootcal-web-calendar' ) );
@@ -145,7 +154,7 @@
 				el( Placeholder, {
 					icon: 'calendar-alt',
 					label: __( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
-					instructions: __( 'Your calendar renders here on the published page. Pick a display mode and optionally paste a feed URL in the block settings on the right, or leave the URL blank to use the one under Settings > ShootCal Web Calendar.', 'shootcal-web-calendar' )
+					instructions: __( 'Your calendar renders here on the published page. Paste your ShootCal embed (the <iframe> snippet or its URL) in the block settings on the right. Other iCal feeds work there too.', 'shootcal-web-calendar' )
 				},
 					el( 'p', { style: { margin: 0, fontSize: '12px', color: '#646970' } }, summaryBits.join( '  •  ' ) )
 				)

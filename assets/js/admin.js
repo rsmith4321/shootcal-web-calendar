@@ -14,8 +14,21 @@
 	var DEFAULT_LIMITED = '#fce3a8';
 	var DEFAULT_BOOKED  = '#f6b9a3';
 
+	// Accept exactly what ShootCal hands you: a full <iframe ...> snippet collapses
+	// to its src URL; a bare URL passes through. isShootCalEmbed gates the feed
+	// test below - a ShootCal embed URL serves HTML, not iCal, so testing it as a
+	// feed would wrongly fail; we just build the shortcode straight away.
+	function extractEmbedUrl( v ) {
+		v = ( v || '' ).trim();
+		var m = v.match( /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i );
+		return m ? m[ 1 ].trim() : v;
+	}
+	function isShootCalEmbed( v ) {
+		return /(?:feed\.shootcal\.com\/[A-Za-z0-9_-]{8,}\.ics|api\.shootcal\.com\/embed\/[A-Za-z0-9_-]{8,})/i.test( v || '' );
+	}
+
 	function currentInputs() {
-		var url    = ( $( '#shootcal-gen-url' ).val() || '' ).trim();
+		var url    = extractEmbedUrl( $( '#shootcal-gen-url' ).val() || '' );
 		var mode   = $( '#shootcal-gen-mode' ).val() || 'availability';
 		var months = parseInt( $( '#shootcal-gen-months' ).val(), 10 );
 		months = ( isNaN( months ) || months < 1 ) ? '' : Math.min( 36, months );
@@ -60,6 +73,14 @@
 		$result.removeClass( 'is-success is-error' ).text( '' );
 		if ( ! v.url ) {
 			$result.addClass( 'is-error' ).text( C.i18n.enterUrl );
+			return;
+		}
+
+		// ShootCal embed: no feed test (it serves HTML, not iCal). Build straight away.
+		if ( isShootCalEmbed( v.url ) ) {
+			$result.addClass( 'is-success' ).text( C.i18n.shootcalEmbed || '' );
+			$( '#shootcal-gen-shortcode' ).val( buildShortcode( v ) );
+			$output.show();
 			return;
 		}
 

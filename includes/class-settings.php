@@ -178,21 +178,24 @@ class Settings {
 			<h1><?php echo esc_html__( 'ShootCal Web Calendar', 'shootcal-web-calendar' ); ?></h1>
 
 			<div class="shootcal-web-calendar__intro" style="max-width:48em;">
-				<p><strong><?php esc_html_e( 'Two ways to add a calendar to a page:', 'shootcal-web-calendar' ); ?></strong></p>
+				<p><strong><?php esc_html_e( 'Using the ShootCal app? Paste your embed - that is the main way.', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'ShootCal gives you a ready-made embed (an <iframe> snippet). Paste it and the plugin just displays your live availability calendar - the same one shown on shootcal.com, including client self-booking. It stays current on its own and never gets stuck behind a page cache, so there is nothing else to configure.', 'shootcal-web-calendar' ); ?></p>
+				<p><strong><?php esc_html_e( 'Two ways to drop it in:', 'shootcal-web-calendar' ); ?></strong></p>
 				<ol>
 					<li><?php
 						/* translators: %s: block name. */
-						printf( esc_html__( 'Block editor (easiest): add the %s block, then paste your feed URL and pick a mode right in the block sidebar. No shortcode needed.', 'shootcal-web-calendar' ), '<strong>ShootCal Web Calendar</strong>' );
+						printf( esc_html__( 'Block editor (easiest): add the %s block, then paste your ShootCal embed (the snippet or its URL) in the block sidebar. No shortcode needed.', 'shootcal-web-calendar' ), '<strong>ShootCal Web Calendar</strong>' );
 					?></li>
-					<li><?php esc_html_e( 'Shortcode: use the generator below to build a shortcode, then paste it into a Shortcode block. This is just an option - the block above does the same thing.', 'shootcal-web-calendar' ); ?></li>
+					<li><?php esc_html_e( 'Shortcode: use the generator below to turn your embed into a shortcode, then paste it into a Shortcode block. Same result as the block.', 'shootcal-web-calendar' ); ?></li>
 				</ol>
-				<p><strong><?php esc_html_e( 'Timezone:', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'the calendar displays in your site\'s timezone. Make sure it is set under Settings > General > Timezone (pick a city such as New York, not a manual UTC offset). ShootCal feeds carry their own timezone, and any embed can override it with a timezone attribute.', 'shootcal-web-calendar' ); ?></p>
-				<p><strong><?php esc_html_e( 'Best paired with the ShootCal app.', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'Any iCal (.ics) feed works here, but Availability mode is built for the ShootCal Mac app. ShootCal publishes a privacy-safe feed that hides your personal event details, builds each day\'s available / limited / booked status from your session types, and tells the plugin your timezone and how many months to show - automatically.', 'shootcal-web-calendar' ); ?></p>
 				<p><?php
 					/* translators: %s: the path within the ShootCal app's settings. */
-					printf( esc_html__( 'To get your ShootCal feed URL: open the ShootCal Mac app, go to %s, and click Copy URL. Treat that URL like a password.', 'shootcal-web-calendar' ), '<em>Settings &rsaquo; Website &rsaquo; Connect to your website</em>' );
+					printf( esc_html__( 'To get your embed: open the ShootCal app, go to %s, and copy the embed snippet (or the URL). Treat it like a password.', 'shootcal-web-calendar' ), '<em>Settings &rsaquo; Website &rsaquo; Connect to your website</em>' );
 				?></p>
 				<p><a href="<?php echo esc_url( 'https://www.ryansmithphotography.com/photography-apps/shootcal/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Learn more about the ShootCal app', 'shootcal-web-calendar' ); ?></a></p>
+
+				<hr />
+				<p><strong><?php esc_html_e( 'Other calendars (Google, Apple, Outlook).', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'Any other iCal (.ics) feed still works: paste its URL instead of a ShootCal embed and the plugin renders the calendar itself, on your page. The Display settings, the per-embed colors, and the Page caching option below apply to these self-rendered calendars (a ShootCal embed ignores them - it carries its own).', 'shootcal-web-calendar' ); ?></p>
+				<p><strong><?php esc_html_e( 'Timezone:', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'self-rendered calendars display in your site timezone (Settings > General > Timezone - pick a city such as New York, not a manual UTC offset). A ShootCal embed carries its own timezone.', 'shootcal-web-calendar' ); ?></p>
 			</div>
 
 			<form method="post" action="options.php">
@@ -204,13 +207,13 @@ class Settings {
 			</form>
 
 			<h2><?php esc_html_e( 'Shortcode generator', 'shootcal-web-calendar' ); ?></h2>
-			<p><?php esc_html_e( 'If you use the WordPress block (above), no shortcode is needed - skip this. To use a shortcode instead: paste a feed URL, choose how it should display, and copy the generated shortcode into a Shortcode block.', 'shootcal-web-calendar' ); ?></p>
+			<p><?php esc_html_e( 'If you use the WordPress block (above), no shortcode is needed - skip this. To use a shortcode instead: paste your ShootCal embed (or another iCal feed URL), choose how it should display, and copy the generated shortcode into a Shortcode block. For a ShootCal embed the display options below come from ShootCal, so you can leave them as-is.', 'shootcal-web-calendar' ); ?></p>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="shootcal-gen-url"><?php esc_html_e( 'Calendar feed URL', 'shootcal-web-calendar' ); ?></label></th>
+					<th scope="row"><label for="shootcal-gen-url"><?php esc_html_e( 'ShootCal embed or feed URL', 'shootcal-web-calendar' ); ?></label></th>
 					<td>
-						<input type="url" id="shootcal-gen-url" class="regular-text code" placeholder="https://" autocomplete="off" />
-						<p class="description"><?php esc_html_e( 'Treat this URL like a password. Google Calendar: Settings > Integrate calendar > Secret address in iCal format. ShootCal app: Settings > Website > Copy URL.', 'shootcal-web-calendar' ); ?></p>
+						<input type="text" id="shootcal-gen-url" class="regular-text code" placeholder="<?php esc_attr_e( 'Paste your ShootCal embed (snippet or URL), or an iCal feed URL', 'shootcal-web-calendar' ); ?>" autocomplete="off" />
+						<p class="description"><?php esc_html_e( 'Treat this like a password. ShootCal app: Settings > Website > copy the embed (snippet or URL). Google Calendar: Settings > Integrate calendar > Secret address in iCal format.', 'shootcal-web-calendar' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -312,6 +315,7 @@ class Settings {
 					'networkError' => __( 'Network error while checking the feed.', 'shootcal-web-calendar' ),
 					'copied'       => __( 'Copied!', 'shootcal-web-calendar' ),
 					'fullHint'     => __( 'This feed has event titles - "Full calendar" mode will show them.', 'shootcal-web-calendar' ),
+					'shootcalEmbed' => __( 'ShootCal embed detected - it displays as your live calendar (no feed test needed).', 'shootcal-web-calendar' ),
 				),
 			)
 		);

@@ -31,14 +31,16 @@ class Shortcode {
 	public function render( $atts = array() ): string {
 		$atts = is_array( $atts ) ? $atts : array();
 
-		// ShootCal feeds render through the hosted, always-current embed
+		// ShootCal embeds render through the hosted, always-current embed
 		// (api.shootcal.com/embed/<token>) so the WordPress calendar is identical
 		// to the one on shootcal.com — and inherits new features automatically,
-		// including client self-booking. Non-ShootCal feeds (Google/Apple/Outlook
-		// .ics) keep using the local renderer below.
-		$token = self::shootcal_feed_token( isset( $atts['url'] ) ? (string) $atts['url'] : '' );
-		if ( null !== $token ) {
-			return $this->render_shootcal_embed( $atts, $token );
+		// including client self-booking. This is the primary path now: you paste
+		// the embed ShootCal gives you (the <iframe> snippet or its URL) and we
+		// just display it. Non-ShootCal feeds (Google/Apple/Outlook .ics) keep
+		// using the local renderer below.
+		$embed = self::parse_shootcal_embed( isset( $atts['url'] ) ? (string) $atts['url'] : '' );
+		if ( null !== $embed ) {
+			return $this->render_shootcal_embed( $atts, $embed['token'], $embed['query'] );
 		}
 
 		// "Page caching" mode: emit a lightweight placeholder that JS hydrates from
@@ -54,39 +56,65 @@ class Shortcode {
 	}
 
 	/**
-	 * If the feed URL is a ShootCal feed, return its public token; otherwise null.
-	 * Accepts both the raw feed (feed.shootcal.com/<token>.ics) and an embed URL
-	 * (api.shootcal.com/embed/<token>).
+	 * Parse a ShootCal embed reference out of whatever the user pasted, so they
+	 * can drop in exactly what ShootCal hands them. Accepts:
+	 *   - the raw feed URL:   https://feed.shootcal.com/<token>.ics
+	 *   - the embed URL:      https://api.shootcal.com/embed/<token>[?months=&mode=&first_day=]
+	 *   - the full snippet:   <iframe ... src="<embed URL>" ...></iframe>  (we pull src out)
+	 * Returns ['token' => string, 'query' => array<string,string>] (display params
+	 * carried on a pasted embed URL), or null when it is not a ShootCal embed.
 	 */
-	private static function shootcal_feed_token( string $url ): ?string {
-		$url = trim( $url );
-		if ( '' === $url ) {
+	private static function parse_shootcal_embed( string $input ): ?array {
+		// Entities can sneak in when a snippet is pasted into an editor field.
+		$input = trim( html_entity_decode( $input, ENT_QUOTES ) );
+		if ( '' === $input ) {
 			return null;
 		}
-		if ( preg_match( '#^https?://feed\.shootcal\.com/([A-Za-z0-9_-]{8,128})\.ics#i', $url, $m ) ) {
-			return $m[1];
+		// A full <iframe> snippet was pasted: lift the src URL out and parse that.
+		if ( preg_match( '#<iframe[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']#i', $input, $m ) ) {
+			$input = trim( $m[1] );
 		}
-		if ( preg_match( '#^https?://api\.shootcal\.com/embed/([A-Za-z0-9_-]{8,128})#i', $url, $m ) ) {
-			return $m[1];
+		// Raw feed URL — carries no display params (those come from the shortcode/block).
+		if ( preg_match( '#https?://feed\.shootcal\.com/([A-Za-z0-9_-]{8,128})\.ics#i', $input, $m ) ) {
+			return array( 'token' => $m[1], 'query' => array() );
+		}
+		// Hosted embed URL — honor any months/mode/first_day it already carries so
+		// a pasted embed displays exactly as ShootCal generated it.
+		if ( preg_match( '#https?://api\.shootcal\.com/embed/([A-Za-z0-9_-]{8,128})#i', $input, $m ) ) {
+			$query = array();
+			$qs    = wp_parse_url( $input, PHP_URL_QUERY );
+			if ( is_string( $qs ) && '' !== $qs ) {
+				parse_str( $qs, $query );
+			}
+			return array( 'token' => $m[1], 'query' => is_array( $query ) ? $query : array() );
 		}
 		return null;
 	}
 
 	/**
-	 * Wrapper output for ShootCal feeds: an <iframe> of the hosted embed that
+	 * Wrapper output for ShootCal embeds: an <iframe> of the hosted embed that
 	 * auto-sizes to its content (the embed posts its height via postMessage).
-	 * Passes through the months / mode / first_day display options.
+	 * Display options (months / mode / first_day) come from the params the pasted
+	 * embed URL already carried, falling back to the shortcode/block attributes -
+	 * so pasting the embed straight from ShootCal displays exactly as generated.
+	 *
+	 * @param array<string,string> $url_query Params lifted off a pasted embed URL.
 	 */
-	private function render_shootcal_embed( array $atts, string $token ): string {
+	private function render_shootcal_embed( array $atts, string $token, array $url_query = array() ): string {
 		$params = array();
-		$months = isset( $atts['months'] ) ? (int) $atts['months'] : 0;
+		$months = isset( $url_query['months'] ) ? (int) $url_query['months']
+			: ( isset( $atts['months'] ) ? (int) $atts['months'] : 0 );
 		if ( $months > 0 ) {
-			$params['months'] = $months;
+			$params['months'] = min( 36, $months );
 		}
-		if ( isset( $atts['mode'] ) && 'full' === $atts['mode'] ) {
+		$mode = isset( $url_query['mode'] ) ? (string) $url_query['mode']
+			: (string) ( $atts['mode'] ?? '' );
+		if ( 'full' === $mode ) {
 			$params['mode'] = 'full';
 		}
-		if ( isset( $atts['first_day'] ) && '1' === (string) $atts['first_day'] ) {
+		$first_day = isset( $url_query['first_day'] ) ? (string) $url_query['first_day']
+			: (string) ( $atts['first_day'] ?? '' );
+		if ( '1' === $first_day ) {
 			$params['first_day'] = '1';
 		}
 		$src = 'https://api.shootcal.com/embed/' . rawurlencode( $token );

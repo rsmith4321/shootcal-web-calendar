@@ -4,15 +4,17 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 2.3.0
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Companion plugin for the ShootCal app (Mac and iOS): show your availability or a full calendar on your WordPress site. Works with any iCal feed.
+Companion plugin for the ShootCal app (Mac and iOS): paste your ShootCal embed to show your live availability calendar. Also renders any iCal feed.
 
 == Description ==
 
-**Two easy ways to embed your calendar.** The simplest: paste the ready-made **embed snippet** from ShootCal (Settings > Booking) into an HTML / "Embed" block — it works on WordPress and every other builder, fills the space, and resizes itself. Or use **this plugin's** shortcode/block for WordPress-native convenience — it does everything the snippet does *and* can render any generic iCal feed (Google, Apple, Outlook) as a clean month grid. Pick whichever you prefer.
+**Using the ShootCal app? Paste your embed - that is the main way.** ShootCal hands you a ready-made embed (an iframe snippet). Paste it into this plugin's block or shortcode and it just displays your live availability calendar - the same one shown on shootcal.com, including client self-booking. It stays current on its own and is immune to page caching, so there is nothing else to set up. (You can also paste that snippet straight into any builder's HTML / "Embed" block without this plugin at all; the plugin is the WordPress-native convenience.)
+
+**Other calendars work too.** Prefer to render on your own page, or not a ShootCal user? Paste any iCal (.ics) feed URL - Google, Apple, or Outlook - and the plugin draws a clean month grid itself, in availability or full-calendar mode. Those self-rendered calendars are what the Display settings, per-embed colors, and Page caching option apply to; a ShootCal embed carries its own and ignores them.
 
 **ShootCal Web Calendar is the companion plugin for the ShootCal scheduling app for Mac and iOS.** Publish your availability - or a full calendar - on your website straight from the calendar you already keep in ShootCal, which hides your personal events, builds each day's availability from your session types, and auto-detects your timezone. It also works with **any** iCal (.ics) feed - Google Calendar, Apple, or Outlook - so you can use it with or without ShootCal.
 
@@ -120,7 +122,11 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 
 == Changelog ==
 
-= 2.3.0 =
+= 2.4.0 =
+* iframe-first: pasting your ShootCal embed is now the primary way to add a calendar. Paste the full embed snippet (the iframe) or its URL into the block, the shortcode generator, or the shortcode `url` - the plugin lifts out the embed and just displays your live calendar.
+* A pasted ShootCal embed now keeps the display options it was generated with (months, mode, week start), so it shows exactly as ShootCal made it.
+* The shortcode generator recognizes a ShootCal embed and skips the iCal feed test (the embed serves a live calendar, not a feed), so it generates instantly.
+* Settings, block, and readme copy reworded to lead with the ShootCal embed; generic iCal feeds (Google, Apple, Outlook) keep the existing local renderer, unchanged.
 * ShootCal embeds now fill the full width of their container (removed the built-in max-width cap), matching the standalone embed.
 * Readme note: ShootCal app users can now paste a ready-made embed snippet from Settings > Booking into any site builder's HTML block — this plugin is optional and remains for shortcode/block users and generic iCal feeds.
 
