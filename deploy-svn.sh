@@ -59,7 +59,7 @@ fi
 echo "Syncing trunk…"
 rsync -a --delete "${EXCLUDES[@]}" "$SRC/" "$SVN/trunk/"
 
-echo "Creating tags/$VERSION…"
+echo "Creating tags/${VERSION}…"
 rm -rf "$SVN/tags/$VERSION"
 mkdir -p "$SVN/tags/$VERSION"
 rsync -a --exclude='.svn' "$SVN/trunk/" "$SVN/tags/$VERSION/"
