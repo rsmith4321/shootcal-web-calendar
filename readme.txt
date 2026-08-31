@@ -2,9 +2,9 @@
 Contributors: rsmith4321
 Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -121,6 +121,9 @@ If you use any other iCal URL (for example from Apple or Outlook), the request g
 1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
 
 == Changelog ==
+
+= 2.4.1 =
+* Verified compatibility with WordPress 7.1. No functional changes.
 
 = 2.4.0 =
 * iframe-first: pasting your ShootCal embed is now the primary way to add a calendar. Paste the full embed snippet (the iframe) or its URL into the block, the shortcode generator, or the shortcode `url` - the plugin lifts out the embed and just displays your live calendar.
