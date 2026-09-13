@@ -149,18 +149,6 @@ class Settings {
 		esc_html_e( 'Turn this on if your site uses full-page caching (e.g. Varnish or a page-cache plugin). The page itself stays cached, but the calendar is fetched fresh on each visit, so availability never gets stuck behind a long page cache. Leave off otherwise.', 'shootcal-web-calendar' );
 		echo '</p>';
 
-		// Explain the automatic compatibility hooks beside the dynamic renderer.
-		if ( ! empty( $opts['ajax_render'] ) ) {
-			echo '<p class="description">';
-			esc_html_e( 'Calendar styles and scripts are automatically excluded from incompatible optimization in Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize. Clear generated CSS and page caches once after updating.', 'shootcal-web-calendar' );
-			echo ' ';
-			printf(
-				/* translators: %s: the plugin directory path to add to the CSS exclusion list. */
-				esc_html__( 'For other optimizers, exclude %s from unused-CSS removal and script delays.', 'shootcal-web-calendar' ),
-				'<code>/shootcal-web-calendar/</code>'
-			);
-			echo '</p>';
-		}
 	}
 
 	public function field_show_credit(): void {
@@ -187,7 +175,7 @@ class Settings {
 			<h1><?php esc_html_e( 'ShootCal Web Calendar', 'shootcal-web-calendar' ); ?></h1>
 			<div class="shootcal-web-calendar__intro" style="max-width:48em;">
 				<p><strong><?php esc_html_e( 'Connect ShootCal with your calendar ID.', 'shootcal-web-calendar' ); ?></strong> <?php esc_html_e( 'Add the ShootCal Web Calendar block, choose ShootCal, and paste your WordPress calendar ID. The plugin displays your live ShootCal calendar or booking page and automatically adjusts its height as visitors use it.', 'shootcal-web-calendar' ); ?></p>
-				<p><?php esc_html_e( 'Find the ID in ShootCal: Clients & Booking > Connect to website. Existing ShootCal embed URLs, iframe snippets, and script snippets can also be pasted into the ID field. They are converted to a calendar ID; pasted code is never executed.', 'shootcal-web-calendar' ); ?></p>
+				<p><?php esc_html_e( 'Find your ID in the Using WordPress? section under ShootCal > Clients & Booking > Booking > Put booking on your website. Existing ShootCal embed URLs, iframe snippets, and script snippets can also be pasted into the ID field. They are converted to a calendar ID; pasted code is never executed.', 'shootcal-web-calendar' ); ?></p>
 				<p><?php esc_html_e( 'Choose Other calendar (iCal) for Google, Apple, Outlook, or another iCal feed. WordPress renders these calendars using the defaults below. A ShootCal embed uses its own display settings.', 'shootcal-web-calendar' ); ?></p>
 			</div>
 			<h2><?php esc_html_e( 'Shortcode generator', 'shootcal-web-calendar' ); ?></h2>
@@ -199,7 +187,7 @@ class Settings {
 				</tr>
 				<tr class="shootcal-gen-hosted-row">
 					<th scope="row"><label for="shootcal-gen-calendar-id"><?php esc_html_e( 'ShootCal calendar ID', 'shootcal-web-calendar' ); ?></label></th>
-					<td><input type="text" id="shootcal-gen-calendar-id" class="regular-text code" autocomplete="off" spellcheck="false" placeholder="<?php esc_attr_e( 'Paste your calendar ID', 'shootcal-web-calendar' ); ?>" /><p class="description"><?php esc_html_e( 'ShootCal: Clients & Booking > Connect to website. You can also paste an existing ShootCal URL, iframe, or script snippet.', 'shootcal-web-calendar' ); ?></p></td>
+					<td><input type="text" id="shootcal-gen-calendar-id" class="regular-text code" autocomplete="off" spellcheck="false" placeholder="<?php esc_attr_e( 'Paste your calendar ID', 'shootcal-web-calendar' ); ?>" /><p class="description"><?php esc_html_e( 'ShootCal > Clients & Booking > Booking: find Using WordPress? under Put booking on your website. You can also paste an existing ShootCal URL, iframe, or script snippet.', 'shootcal-web-calendar' ); ?></p></td>
 				</tr>
 				<tr class="shootcal-gen-hosted-row">
 					<th scope="row"><label for="shootcal-gen-view"><?php esc_html_e( 'ShootCal display', 'shootcal-web-calendar' ); ?></label></th>

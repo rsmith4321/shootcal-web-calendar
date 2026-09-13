@@ -14,6 +14,8 @@ defined( 'ABSPATH' ) || exit;
 class Compatibility {
 
 	private const STYLESHEETS = array( '/shootcal-web-calendar/assets/css/frontend.css' );
+	private const STYLE_HANDLES = array( 'shootcal-web-calendar' );
+	private const SCRIPT_HANDLES = array( 'shootcal-web-calendar', 'shootcal-web-calendar-embed' );
 
 	private const SCRIPTS = array(
 		'/shootcal-web-calendar/assets/js/frontend.js',
@@ -47,10 +49,44 @@ class Compatibility {
 		add_filter( 'autoptimize_filter_css_exclude', array( self::class, 'autoptimize_stylesheets' ) );
 		add_filter( 'autoptimize_filter_js_exclude', array( self::class, 'autoptimize_scripts' ) );
 		add_filter( 'autoptimize_filter_css_defer_excluded', array( self::class, 'autoptimize_defer_stylesheet' ), 10, 2 );
+
+		// WP-Optimize checks its blacklist before the optional async JS wrapper.
+		add_filter( 'wp-optimize-minify-default-exclusions', array( self::class, 'exclude_assets' ) );
+		add_filter( 'wp-optimize-minify-blacklist', array( self::class, 'exclude_assets' ) );
+
+		// SiteGround uses handles for enqueued assets and paths for HTML combining.
+		foreach ( array( 'sgo_css_minify_exclude', 'sgo_css_combine_exclude' ) as $hook ) {
+			add_filter( $hook, array( self::class, 'exclude_style_handles' ) );
+		}
+		foreach ( array( 'sgo_js_minify_exclude', 'sgo_javascript_combine_exclude', 'sgo_js_async_exclude' ) as $hook ) {
+			add_filter( $hook, array( self::class, 'exclude_script_handles' ) );
+		}
+		add_filter( 'sgo_javascript_combine_excluded_inline_content', array( self::class, 'exclude_inline_config' ) );
+		add_filter( 'sgo_javascript_combine_excluded_external_paths', array( self::class, 'exclude_script_files' ) );
+		add_filter( 'sgo_javascript_combine_excluded_internal_paths', array( self::class, 'exclude_script_files' ) );
+
+		add_filter( 'wphb_delay_js_exclusions', array( self::class, 'exclude_script_patterns' ) );
+		add_filter( 'wphb_critical_css_exclusions', array( self::class, 'exclude_stylesheets' ) );
+		foreach ( array( 'wphb_minify_resource', 'wphb_combine_resource', 'wphb_defer_resource', 'wphb_async_resource', 'wphb_inline_resource' ) as $hook ) {
+			// Hummingbird applies the saved per-handle choices at priority 10.
+			add_filter( $hook, array( self::class, 'hummingbird_resource' ), 20, 4 );
+		}
+
+		// Preserve tag boundaries so W3TC does not combine across these scripts.
+		add_filter( 'w3tc_minify_js_do_tag_minification', array( self::class, 'w3tc_script' ), 20, 2 );
+		add_filter( 'w3tc_minify_css_do_tag_minification', array( self::class, 'autoptimize_defer_stylesheet' ), 20, 2 );
+
+		// FlyingPress publishes minification filters; delay exclusions are separate.
+		add_filter( 'flying_press_exclude_from_minify:js', array( self::class, 'exclude_script_files' ) );
+		add_filter( 'flying_press_exclude_from_minify:css', array( self::class, 'exclude_stylesheets' ) );
+
+		// NitroPack itself uses this attribute for scripts that must run normally.
+		add_filter( 'script_loader_tag', array( self::class, 'nitropack_script' ), 20, 3 );
+		add_filter( 'wp_inline_script_attributes', array( self::class, 'nitropack_inline_config' ) );
 	}
 
 	/**
-	 * WP Rocket interprets these lists as regular expressions.
+	 * WP Rocket and Hummingbird interpret these lists as regular expressions.
 	 *
 	 * @param mixed $exclusions Existing regular expressions.
 	 * @return mixed
@@ -101,6 +137,123 @@ class Compatibility {
 			return false;
 		}
 		return $defer;
+	}
+
+	/**
+	 * @param mixed $minify Whether W3TC should process the script tag.
+	 * @param mixed $tag The complete original script tag.
+	 * @return mixed
+	 */
+	public static function w3tc_script( $minify, $tag ) {
+		return self::contains( $tag, self::SCRIPTS ) ? false : $minify;
+	}
+
+	/**
+	 * Keep only our resources out of Hummingbird's asset transformations.
+	 *
+	 * @param mixed $optimize Existing decision for this operation.
+	 * @param mixed $handle WordPress asset handle.
+	 * @param mixed $type Either scripts or styles.
+	 * @param mixed $url Original resource URL.
+	 * @return mixed
+	 */
+	public static function hummingbird_resource( $optimize, $handle, $type, $url ) {
+		if ( 'scripts' === $type && ( in_array( $handle, self::SCRIPT_HANDLES, true ) || self::contains( $url, self::script_files() ) ) ) {
+			return false;
+		}
+		if ( 'styles' === $type && ( in_array( $handle, self::STYLE_HANDLES, true ) || self::contains( $url, self::STYLESHEETS ) ) ) {
+			return false;
+		}
+		return $optimize;
+	}
+
+	/**
+	 * @param mixed $tag Enqueued script markup.
+	 * @param mixed $handle WordPress script handle.
+	 * @param mixed $src Script source URL.
+	 * @return mixed
+	 */
+	public static function nitropack_script( $tag, $handle, $src ) {
+		if ( ! is_string( $tag ) || ( ! in_array( $handle, self::SCRIPT_HANDLES, true ) && ! self::contains( $src, self::script_files() ) ) ) {
+			return $tag;
+		}
+		$processor = new \WP_HTML_Tag_Processor( $tag );
+		while ( $processor->next_tag( array( 'tag_name' => 'SCRIPT' ) ) ) {
+			// A loader tag can also contain before/after inline code. Protect the
+			// external asset here; localized configuration has its own WP filter.
+			if ( null !== $processor->get_attribute( 'src' ) ) {
+				$processor->set_attribute( 'nitro-exclude', true );
+				break;
+			}
+		}
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * @param mixed $attributes Inline script HTML attributes.
+	 * @return mixed
+	 */
+	public static function nitropack_inline_config( $attributes ) {
+		if ( is_array( $attributes ) && 'shootcal-web-calendar-js-extra' === ( $attributes['id'] ?? null ) ) {
+			$attributes['nitro-exclude'] = true;
+		}
+		return $attributes;
+	}
+
+	/**
+	 * @param mixed $exclusions Existing literal asset paths.
+	 * @return mixed
+	 */
+	public static function exclude_assets( $exclusions ) {
+		return self::append( $exclusions, array_merge( self::STYLESHEETS, self::script_files() ) );
+	}
+
+	/**
+	 * @param mixed $exclusions Existing stylesheet handles.
+	 * @return mixed
+	 */
+	public static function exclude_style_handles( $exclusions ) {
+		return self::append( $exclusions, self::STYLE_HANDLES );
+	}
+
+	/**
+	 * @param mixed $exclusions Existing script handles.
+	 * @return mixed
+	 */
+	public static function exclude_script_handles( $exclusions ) {
+		return self::append( $exclusions, self::SCRIPT_HANDLES );
+	}
+
+	/**
+	 * @param mixed $exclusions Existing script URL fragments.
+	 * @return mixed
+	 */
+	public static function exclude_script_files( $exclusions ) {
+		return self::append( $exclusions, self::script_files() );
+	}
+
+	/**
+	 * @return array Script paths without the inline configuration marker.
+	 */
+	private static function script_files(): array {
+		return array_slice( self::SCRIPTS, 0, 3 );
+	}
+
+	/**
+	 * @param mixed $content Resource URL or markup.
+	 * @param array $fragments Literal paths or inline content to find.
+	 * @return bool
+	 */
+	private static function contains( $content, array $fragments ): bool {
+		if ( ! is_string( $content ) ) {
+			return false;
+		}
+		foreach ( $fragments as $fragment ) {
+			if ( false !== strpos( $content, $fragment ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

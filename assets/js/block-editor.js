@@ -54,7 +54,7 @@
 			} );
 			var referenceControl = el( TextControl, {
 				label: hosted ? __( 'ShootCal calendar ID', 'shootcal-web-calendar' ) : __( 'iCal feed URL', 'shootcal-web-calendar' ),
-				help: hosted ? __( 'Find your ID under Connect to website. An existing embed code works too.', 'shootcal-web-calendar' ) : __( 'Paste an HTTP or HTTPS iCal feed URL. Treat private feed URLs like passwords.', 'shootcal-web-calendar' ),
+				help: hosted ? __( 'Find your ID in Using WordPress? under ShootCal > Clients & Booking > Booking > Put booking on your website. An existing embed code works too.', 'shootcal-web-calendar' ) : __( 'Paste an HTTP or HTTPS iCal feed URL. Treat private feed URLs like passwords.', 'shootcal-web-calendar' ),
 				type: hosted ? 'text' : 'url', value: value, autoComplete: 'off', spellCheck: false,
 				placeholder: hosted ? __( 'Paste your ShootCal calendar ID', 'shootcal-web-calendar' ) : 'https://example.com/calendar.ics',
 				onChange: hosted ? setReference : function ( input ) { set( { source: 'ical', url: input.trim() } ); }

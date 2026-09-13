@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.5.1
+Stable tag: 2.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Connect your live ShootCal calendar with its ID, or display an iCal calendar fro
 
 == Description ==
 
-**ShootCal: paste your calendar ID.** Add the ShootCal Web Calendar block, choose ShootCal, and paste the WordPress calendar ID from **ShootCal > Clients & Booking > Connect to website**. Your website displays the live ShootCal calendar or booking page. It automatically adjusts its height when visitors navigate or open booking forms, and follows updates made in ShootCal.
+**ShootCal: paste your calendar ID.** Add the ShootCal Web Calendar block, choose ShootCal, and paste the WordPress calendar ID from **ShootCal > Clients & Booking > Booking**, under **Put booking on your website > Using WordPress?**. Your website displays the live ShootCal calendar or booking page. It automatically adjusts its height when visitors navigate or open booking forms, and follows updates made in ShootCal.
 
 Choose **Follow ShootCal settings** to show booking when enabled in your account, or **Calendar only** to always show the month calendar. Your ShootCal timezone, availability, and booking rules remain managed in ShootCal.
 
@@ -72,11 +72,21 @@ Add a separate block or shortcode for each calendar. Each embedded ShootCal fram
 
 = Do I need to exclude the calendar in my performance plugin? =
 
-Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize receive automatic exclusions for this plugin's frontend stylesheet and calendar startup scripts, including the official standalone ShootCal embed loader. The inline calendar configuration is protected with its script. This keeps dynamically loaded calendar styles available and prevents startup from waiting for a visitor's first interaction. Existing optimizer settings and other files are preserved.
+The plugin supplies narrow compatibility exclusions automatically, without changing saved optimizer settings or disabling optimization for other files:
 
-Clear generated/used CSS and page/CDN caches once after updating so old optimized pages are regenerated. The exclusions are supplied through each optimizer's filters and may not appear in its saved settings fields. They do not override an explicit Script Manager rule that unloads the plugin entirely.
+* Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize: calendar stylesheet and startup-script exclusions, including dynamic calendar states and inline configuration.
+* SiteGround Speed Optimizer: stylesheet/script minification and combination, and asynchronous script loading.
+* WP-Optimize: stylesheet/script minification and combination, plus its deferred/asynchronous JavaScript loader.
+* Hummingbird: asset minification/combination, deferred/asynchronous scripts, delayed JavaScript, and critical-CSS stylesheet removal/loading.
+* W3 Total Cache: automatic CSS/JavaScript minification and combination.
+* FlyingPress: CSS/JavaScript minification.
+* NitroPack: the plugin's enqueued startup scripts and inline configuration carry its script exclusion attribute.
 
-For other optimizers, exclude `/shootcal-web-calendar/assets/css/frontend.css` from unused-CSS removal, and exclude `/shootcal-web-calendar/assets/js/`, `ShootCalWebCalendarFront`, and `api.shootcal.com/embed.js` from script delays or combination. Hosted ShootCal content has its own stylesheet inside the iframe.
+Some separate features need an exclusion in the optimizer's own settings: FlyingPress delayed JavaScript and unused CSS; NitroPack CSS and standalone embed snippets added outside this plugin; W3 Total Cache's explicit Defer Scripts inclusion list; and delay features in editions without a public compatibility filter. These features are not covered by the minification exclusions above.
+
+When needed, use `/shootcal-web-calendar/assets/css/frontend.css` for CSS and `/shootcal-web-calendar/assets/js/`, `ShootCalWebCalendarFront`, and `api.shootcal.com/embed.js` for scripts. FlyingPress accepts partial keywords in its exclusions. In [NitroPack Excluded Resources](https://support.nitropack.io/en/articles/8390302-excluded-resources), wrap a partial path or inline marker in `*` wildcards and leave Excluded Operations empty to exclude it from all optimization and loading changes. Keep ShootCal scripts out of W3 Total Cache's Defer Scripts inclusion list. Hosted ShootCal content has its own stylesheet inside the iframe.
+
+Clear generated/used CSS and page/CDN caches once after updating so cached pages receive the new exclusions. Filter-supplied exclusions may not appear in saved settings fields. Explicit Script Manager rules that unload the plugin entirely remain under your control.
 
 == Shortcode attributes ==
 
@@ -105,6 +115,9 @@ Imported ShootCal URLs retain validated presentation parameters for compatibilit
 
 == Upgrade Notice ==
 
+= 2.5.2 =
+Expands performance-plugin compatibility and simplifies setup help. Clear generated CSS and page/CDN caches once after updating.
+
 = 2.5.1 =
 Adds automatic performance-plugin exclusions and a 12-month ShootCal default. Clear generated CSS and page/CDN caches once after updating.
 
@@ -112,6 +125,12 @@ Adds automatic performance-plugin exclusions and a 12-month ShootCal default. Cl
 Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches after upgrading. If you used a private iCal URL with Page caching, replace that URL with your provider.
 
 == Changelog ==
+
+= 2.5.2 =
+* Add verified exclusions for WP-Optimize, SiteGround Speed Optimizer, Hummingbird, and W3 Total Cache automatic minification.
+* Add FlyingPress minification exclusions and NitroPack script exclusion attributes; document their separate manual exclusions.
+* Preserve existing optimizer rules and other assets, without changing saved settings.
+* Remove the optimization notice from calendar setup and correct the ShootCal calendar-ID help path.
 
 = 2.5.1 =
 * Automatically protect calendar styles and startup scripts in Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize.
