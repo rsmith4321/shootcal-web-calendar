@@ -19,6 +19,11 @@ class Assets {
 	}
 
 	public function register_frontend(): void {
+		wp_register_script(
+			'shootcal-web-calendar-embed',
+			PLUGIN_URL . 'assets/js/embed.js',
+			array(), VERSION, array( 'in_footer' => true, 'strategy' => 'defer' )
+		);
 		wp_register_style(
 			'shootcal-web-calendar',
 			PLUGIN_URL . 'assets/css/frontend.css',

@@ -2,18 +2,30 @@
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
 	"name": "shootcal-web-calendar/calendar",
-	"version": "1.0.0",
+	"version": "2.5.0",
 	"title": "ShootCal Web Calendar",
 	"category": "widgets",
 	"icon": "calendar-alt",
-	"description": "Show an iCal calendar as a month grid - free/busy availability or a full calendar with event titles and times. Paste the feed URL right in the block.",
-	"keywords": [ "calendar", "availability", "booking", "photographer", "shootcal" ],
+	"description": "Connect a live ShootCal calendar with its ID, or display an iCal feed from Google, Apple, Outlook, or another provider.",
+	"keywords": [
+		"calendar",
+		"availability",
+		"booking",
+		"photographer",
+		"shootcal"
+	],
 	"textdomain": "shootcal-web-calendar",
 	"supports": {
 		"html": false,
-		"align": [ "wide", "full" ],
+		"align": [
+			"wide",
+			"full"
+		],
 		"spacing": {
-			"margin": [ "top", "bottom" ]
+			"margin": [
+				"top",
+				"bottom"
+			]
 		}
 	},
 	"attributes": {
@@ -46,6 +58,36 @@
 		"bookedColor": {
 			"type": "string",
 			"default": ""
+		},
+		"source": {
+			"type": "string",
+			"default": "auto",
+			"enum": [
+				"auto",
+				"shootcal",
+				"ical"
+			]
+		},
+		"calendarId": {
+			"type": "string",
+			"default": ""
+		},
+		"embedView": {
+			"type": "string",
+			"enum": [
+				"default",
+				"calendar"
+			]
+		},
+		"theme": {
+			"type": "string",
+			"enum": [
+				"light",
+				"dark"
+			]
+		},
+		"embedParams": {
+			"type": "object"
 		}
 	},
 	"editorScript": "shootcal-web-calendar-block-editor"

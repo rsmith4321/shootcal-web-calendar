@@ -28,6 +28,7 @@ class Block {
 		// Pre-register the editor script with explicit dependencies so we do not
 		// need a build pipeline (no .asset.php file). The script is vanilla JS,
 		// no JSX, no bundler.
+		wp_register_script( 'shootcal-embed-reference', PLUGIN_URL . 'assets/js/embed-reference.js', array(), VERSION, true );
 		wp_register_script(
 			self::EDITOR_SCRIPT,
 			PLUGIN_URL . 'assets/js/block-editor.js',
@@ -37,6 +38,7 @@ class Block {
 				'wp-block-editor',
 				'wp-components',
 				'wp-i18n',
+				'shootcal-embed-reference',
 			),
 			VERSION,
 			true
@@ -59,6 +61,26 @@ class Block {
 	 */
 	public function render( array $attributes, string $content = '', $block = null ): string {
 		$atts = array();
+		if ( isset( $attributes['source'] ) && in_array( $attributes['source'], array( 'shootcal', 'ical' ), true ) ) {
+			$atts['source'] = $attributes['source'];
+		}
+		if ( ! empty( $attributes['calendarId'] ) && is_string( $attributes['calendarId'] ) ) {
+			$atts['calendar_id'] = $attributes['calendarId'];
+		}
+		// Imported presentation data is validated again by the hosted renderer.
+		if ( 'ical' !== ( $atts['source'] ?? '' ) && isset( $attributes['embedParams'] ) && is_array( $attributes['embedParams'] ) ) {
+			foreach ( array( 'months', 'mode', 'first_day', 'view', 'theme', 'sc_card', 'sc_ink', 'sc_soft', 'sc_line', 'sc_accent', 'sc_font' ) as $key ) {
+				if ( isset( $attributes['embedParams'][ $key ] ) && is_scalar( $attributes['embedParams'][ $key ] ) ) {
+					$atts[ $key ] = (string) $attributes['embedParams'][ $key ];
+				}
+			}
+		}
+		if ( isset( $attributes['embedView'] ) && in_array( $attributes['embedView'], array( 'default', 'calendar' ), true ) ) {
+			$atts['view'] = $attributes['embedView'];
+		}
+		if ( isset( $attributes['theme'] ) && in_array( $attributes['theme'], array( 'light', 'dark' ), true ) ) {
+			$atts['theme'] = $attributes['theme'];
+		}
 
 		if ( isset( $attributes['months'] ) && (int) $attributes['months'] > 0 ) {
 			$atts['months'] = (string) (int) $attributes['months'];

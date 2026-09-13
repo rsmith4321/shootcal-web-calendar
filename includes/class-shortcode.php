@@ -31,16 +31,16 @@ class Shortcode {
 	public function render( $atts = array() ): string {
 		$atts = is_array( $atts ) ? $atts : array();
 
-		// ShootCal embeds render through the hosted, always-current embed
-		// (api.shootcal.com/embed/<token>) so the WordPress calendar is identical
-		// to the one on shootcal.com — and inherits new features automatically,
-		// including client self-booking. This is the primary path now: you paste
-		// the embed ShootCal gives you (the <iframe> snippet or its URL) and we
-		// just display it. Non-ShootCal feeds (Google/Apple/Outlook .ics) keep
-		// using the local renderer below.
-		$embed = self::parse_shootcal_embed( isset( $atts['url'] ) ? (string) $atts['url'] : '' );
-		if ( null !== $embed ) {
-			return $this->render_shootcal_embed( $atts, $embed['token'], $embed['query'] );
+		$source = (string) ( $atts['source'] ?? 'auto' );
+		if ( 'ical' !== $source ) {
+			$input = (string) ( $atts['calendar_id'] ?? $atts['url'] ?? '' );
+			$embed = Embed_Reference::parse( $input );
+			if ( null !== $embed ) {
+				return $this->render_shootcal_embed( $atts, $embed['token'], $embed['query'] );
+			}
+			if ( 'shootcal' === $source || ! empty( $atts['calendar_id'] ) || str_contains( $input, '<' ) ) {
+				return $this->render_admin_notice( __( 'Enter a valid ShootCal embed ID, or paste the ShootCal embed code or URL.', 'shootcal-web-calendar' ) );
+			}
 		}
 
 		// "Page caching" mode: emit a lightweight placeholder that JS hydrates from
@@ -55,80 +55,16 @@ class Shortcode {
 		return $this->render_calendar( $atts );
 	}
 
-	/**
-	 * Parse a ShootCal embed reference out of whatever the user pasted, so they
-	 * can drop in exactly what ShootCal hands them. Accepts:
-	 *   - the raw feed URL:   https://feed.shootcal.com/<token>.ics
-	 *   - the embed URL:      https://api.shootcal.com/embed/<token>[?months=&mode=&first_day=]
-	 *   - the full snippet:   <iframe ... src="<embed URL>" ...></iframe>  (we pull src out)
-	 * Returns ['token' => string, 'query' => array<string,string>] (display params
-	 * carried on a pasted embed URL), or null when it is not a ShootCal embed.
-	 */
-	private static function parse_shootcal_embed( string $input ): ?array {
-		// Entities can sneak in when a snippet is pasted into an editor field.
-		$input = trim( html_entity_decode( $input, ENT_QUOTES ) );
-		if ( '' === $input ) {
-			return null;
-		}
-		// A full <iframe> snippet was pasted: lift the src URL out and parse that.
-		if ( preg_match( '#<iframe[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']#i', $input, $m ) ) {
-			$input = trim( $m[1] );
-		}
-		// Raw feed URL — carries no display params (those come from the shortcode/block).
-		if ( preg_match( '#https?://feed\.shootcal\.com/([A-Za-z0-9_-]{8,128})\.ics#i', $input, $m ) ) {
-			return array( 'token' => $m[1], 'query' => array() );
-		}
-		// Hosted embed URL — honor any months/mode/first_day it already carries so
-		// a pasted embed displays exactly as ShootCal generated it.
-		if ( preg_match( '#https?://api\.shootcal\.com/embed/([A-Za-z0-9_-]{8,128})#i', $input, $m ) ) {
-			$query = array();
-			$qs    = wp_parse_url( $input, PHP_URL_QUERY );
-			if ( is_string( $qs ) && '' !== $qs ) {
-				parse_str( $qs, $query );
-			}
-			return array( 'token' => $m[1], 'query' => is_array( $query ) ? $query : array() );
-		}
-		return null;
-	}
-
-	/**
-	 * Wrapper output for ShootCal embeds: an <iframe> of the hosted embed that
-	 * auto-sizes to its content (the embed posts its height via postMessage).
-	 * Display options (months / mode / first_day) come from the params the pasted
-	 * embed URL already carried, falling back to the shortcode/block attributes -
-	 * so pasting the embed straight from ShootCal displays exactly as generated.
-	 *
-	 * @param array<string,string> $url_query Params lifted off a pasted embed URL.
-	 */
+	/** Render trusted hosted markup; the plugin supplies automatic frame sizing. */
 	private function render_shootcal_embed( array $atts, string $token, array $url_query = array() ): string {
-		$params = array();
-		$months = isset( $url_query['months'] ) ? (int) $url_query['months']
-			: ( isset( $atts['months'] ) ? (int) $atts['months'] : 0 );
-		if ( $months > 0 ) {
-			$params['months'] = min( 36, $months );
-		}
-		$mode = isset( $url_query['mode'] ) ? (string) $url_query['mode']
-			: (string) ( $atts['mode'] ?? '' );
-		if ( 'full' === $mode ) {
-			$params['mode'] = 'full';
-		}
-		$first_day = isset( $url_query['first_day'] ) ? (string) $url_query['first_day']
-			: (string) ( $atts['first_day'] ?? '' );
-		if ( '1' === $first_day ) {
-			$params['first_day'] = '1';
-		}
-		$src = 'https://api.shootcal.com/embed/' . rawurlencode( $token );
-		if ( $params ) {
-			$src .= '?' . http_build_query( $params );
-		}
-		$id = 'scwc-' . substr( md5( $token . wp_json_encode( $params ) ), 0, 8 );
+		// Explicit block/shortcode choices override imported URL presentation.
+		$params = Embed_Reference::parameters( array_merge( $url_query, $atts ) );
+		$src = Embed_Reference::url( $token, $params );
+		wp_enqueue_script( 'shootcal-web-calendar-embed' );
 		return '<div class="shootcal-web-calendar-embed" style="width:100%">'
-			. '<iframe id="' . esc_attr( $id ) . '" src="' . esc_url( $src ) . '" loading="lazy" scrolling="no"'
-			. ' title="' . esc_attr__( 'Availability calendar', 'shootcal-web-calendar' ) . '"'
-			. ' style="width:100%;border:0;display:block;min-height:520px"></iframe></div>'
-			. '<script>(function(){var f=document.getElementById(' . wp_json_encode( $id ) . ');if(!f)return;'
-			. 'window.addEventListener("message",function(e){if(f.contentWindow&&e.source!==f.contentWindow)return;'
-			. 'var d=e.data;if(d&&d.shootcalEmbed&&d.height)f.style.height=Math.max(360,d.height)+"px";});})();</script>';
+			. '<iframe data-shootcal-embed src="' . esc_url( $src ) . '" loading="lazy"'
+			. ' title="' . esc_attr__( 'ShootCal calendar and booking', 'shootcal-web-calendar' ) . '"'
+			. ' style="width:100%;border:0;display:block;height:640px;background:transparent"></iframe></div>';
 	}
 
 	/**
@@ -142,10 +78,9 @@ class Shortcode {
 	}
 
 	/**
-	 * Placeholder emitted in "Page caching" mode. Carries the embed's feed URL +
-	 * display options as data attributes, plus an HMAC signature so the AJAX
-	 * endpoint can trust the URL (see signature()). JS swaps in the real calendar
-	 * after the (cacheable) page loads.
+	 * Placeholder emitted in "Page caching" mode. The URL and display options
+	 * travel in an authenticated encrypted payload, keeping private feed addresses
+	 * out of public HTML. JavaScript loads fresh output after the cached page.
 	 *
 	 * @param array<string,string> $atts
 	 */
@@ -153,46 +88,50 @@ class Shortcode {
 		$opts      = Settings::get_options();
 		$url       = esc_url_raw( trim( html_entity_decode( (string) ( $atts['url'] ?? '' ), ENT_QUOTES ) ) );
 		$mode      = ( isset( $atts['mode'] ) && 'full' === strtolower( (string) $atts['mode'] ) ) ? 'full' : 'availability';
-		$months    = ( isset( $atts['months'] ) && (int) $atts['months'] > 0 ) ? (string) (int) $atts['months'] : '';
-		$first_day = ( isset( $atts['first_day'] ) && '1' === (string) $atts['first_day'] ) ? '1' : (string) (int) $opts['first_day_of_week'];
+		$months    = ( isset( $atts['months'] ) && (int) $atts['months'] > 0 ) ? (string) min( 36, (int) $atts['months'] ) : '';
+		$first_day = ( isset( $atts['first_day'] ) && in_array( (string) $atts['first_day'], array( '0', '1' ), true ) ) ? (string) $atts['first_day'] : (string) (int) $opts['first_day_of_week'];
 		$timezone  = ! empty( $atts['timezone'] ) ? (string) $atts['timezone'] : '';
 		$msd       = ( isset( $atts['multi_session_day'] ) && '0' === (string) $atts['multi_session_day'] ) ? '0' : '1';
 		// Per-embed color overrides only apply (and only get signed) in availability mode.
 		$limited   = ( 'availability' === $mode && ! empty( $atts['limited_color'] ) ) ? (string) sanitize_hex_color( (string) $atts['limited_color'] ) : '';
 		$booked    = ( 'availability' === $mode && ! empty( $atts['booked_color'] ) )  ? (string) sanitize_hex_color( (string) $atts['booked_color'] )  : '';
-		$sig       = self::signature( $url, $mode, $months, $first_day, $timezone, $msd, $limited, $booked );
-
-		$data  = ' data-shootcal-url="' . esc_attr( $url ) . '"';
-		$data .= ' data-shootcal-mode="' . esc_attr( $mode ) . '"';
-		if ( '' !== $months ) {
-			$data .= ' data-shootcal-months="' . esc_attr( $months ) . '"';
+		$payload = Feed_Payload::encode( array(
+			'url' => $url, 'mode' => $mode, 'months' => $months,
+			'first_day' => $first_day, 'timezone' => $timezone,
+			'multi_session_day' => $msd, 'limited_color' => $limited, 'booked_color' => $booked,
+		) );
+		if ( null === $payload ) {
+			// A host without authenticated encryption still renders safely on the server.
+			return $this->render_calendar( $atts );
 		}
-		$data .= ' data-shootcal-first-day="' . esc_attr( $first_day ) . '"';
-		if ( '' !== $timezone ) {
-			$data .= ' data-shootcal-timezone="' . esc_attr( $timezone ) . '"';
-		}
-		$data .= ' data-shootcal-msd="' . esc_attr( $msd ) . '"';
-		if ( '' !== $limited ) {
-			$data .= ' data-shootcal-limited-color="' . esc_attr( $limited ) . '"';
-		}
-		if ( '' !== $booked ) {
-			$data .= ' data-shootcal-booked-color="' . esc_attr( $booked ) . '"';
-		}
-		$data .= ' data-shootcal-sig="' . esc_attr( $sig ) . '"';
-
-		return '<div class="shootcal-web-calendar__wrap shootcal-web-calendar__lazy" data-shootcal-lazy' . $data . '>'
-			. '<p class="shootcal-web-calendar__lazy-msg">' . esc_html__( 'Loading calendar…', 'shootcal-web-calendar' ) . '</p>'
-			. '</div>';
+		return '<div class="shootcal-web-calendar__wrap shootcal-web-calendar__lazy" data-shootcal-lazy data-shootcal-payload="'
+			. esc_attr( $payload ) . '"><p class="shootcal-web-calendar__lazy-msg">'
+			. esc_html__( 'Loading calendar…', 'shootcal-web-calendar' ) . '</p></div>';
 	}
 
 	/**
 	 * AJAX endpoint: render the calendar fresh, bypassing full-page caches.
-	 * Public (logged-in + logged-out), read-only. The URL + options must carry a
-	 * valid HMAC signature (see signature()), so this endpoint can only render an
-	 * embed the plugin itself emitted - never an arbitrary attacker URL. The fetch
+	 * Public (logged-in + logged-out), read-only. The authenticated payload allows
+	 * only inputs emitted by this site. The HMAC path supports older cached pages. The fetch
 	 * still goes through wp_safe_remote_get, which blocks internal/SSRF targets.
 	 */
 	public function handle_ajax_render(): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- payload is authenticated with the site's secret key.
+		if ( isset( $_POST['payload'] ) ) {
+			$payload = is_string( $_POST['payload'] ) ? sanitize_text_field( wp_unslash( $_POST['payload'] ) ) : '';
+			$attributes = Feed_Payload::decode( $payload );
+			if ( null === $attributes ) {
+				wp_die( '', '', array( 'response' => 400 ) );
+			}
+			nocache_headers();
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer escapes dynamic output.
+			echo $this->render_calendar( $attributes );
+			wp_die();
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+		// Compatibility for pages cached by versions before 2.5.0. New pages never
+		// emit the URL here; clear full-page caches after upgrading to remove old markup.
+
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- authenticated by the HMAC signature below, not a nonce.
 		// The posted URL is the exact value render() already normalized
 		// (esc_url_raw + trim) and echoed into the embed, so re-running
@@ -337,8 +276,17 @@ class Shortcode {
 			return $cached_html;
 		}
 
+		$range_start = ( new \DateTimeImmutable( 'first day of this month', $tz ) )->setTime( 0, 0, 0 );
+		$parse_months = $attr_months > 0 ? min( 36, $attr_months ) : ( 'shootcal' === $source ? 36 : (int) $opts['months_ahead'] );
+		$range_end = $range_start->modify( '+' . max( 1, $parse_months ) . ' months' );
+		// Month grids include adjacent-month cells; retain their busy dates too.
+		$leading = ( (int) $range_start->format( 'w' ) - $first_dow + 7 ) % 7;
+		$grid_start = $range_start->modify( '-' . $leading . ' days' );
+		$last_month = $range_end->modify( '-1 month' );
+		$last_leading = ( (int) $last_month->format( 'w' ) - $first_dow + 7 ) % 7;
+		$grid_end = $last_month->modify( '-' . $last_leading . ' days' )->modify( '+42 days' );
 		$parser = new ICal_Parser();
-		$events = $parser->parse( $ical );
+		$events = $parser->parse( $ical, $grid_start, $grid_end );
 
 		$today        = new \DateTimeImmutable( 'today', $tz );
 		$window_start = $today->modify( 'first day of this month' )->setTime( 0, 0, 0 );
@@ -363,7 +311,7 @@ class Shortcode {
 		$events = array_values(
 			array_filter(
 				$events,
-				static fn( Event $e ) => $e->overlaps( $window_start, $window_end )
+				static fn( Event $e ) => $e->overlaps( $grid_start, $grid_end )
 			)
 		);
 
@@ -372,7 +320,7 @@ class Shortcode {
 		// difference is ~675K overlap checks vs ~1500 hash lookups.
 		$events_by_day = array();
 		foreach ( $events as $event ) {
-			foreach ( $event->days_covered( $tz ) as $day_key ) {
+			foreach ( $event->days_covered( $tz, $grid_start, $grid_end ) as $day_key ) {
 				$events_by_day[ $day_key ][] = $event;
 			}
 		}

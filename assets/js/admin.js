@@ -1,139 +1,99 @@
-/* ShootCal Web Calendar - admin settings page: shortcode generator.
- * Paste a feed URL, pick a mode, "Check feed & generate" validates the feed via
- * the same wp_safe_remote_get path the front end uses, then builds a copy-paste
- * shortcode. The shortcode tag string is renamed in lockstep with the slug.
- */
+/* ShootCal settings: normalize references and generate a safe shortcode. */
 ( function ( $ ) {
 	'use strict';
-
 	var C = window.ShootCalWebCalendar || { i18n: {} };
-
-	// Built-in cell-color defaults. When a picker matches its default we omit the
-	// attribute, so "default" means "no attribute" and the stylesheet's own colors
-	// apply (smaller markup, and the embed tracks any future default change).
-	var DEFAULT_LIMITED = '#fce3a8';
-	var DEFAULT_BOOKED  = '#f6b9a3';
-
-	// Accept exactly what ShootCal hands you: a full <iframe ...> snippet collapses
-	// to its src URL; a bare URL passes through. isShootCalEmbed gates the feed
-	// test below - a ShootCal embed URL serves HTML, not iCal, so testing it as a
-	// feed would wrongly fail; we just build the shortcode straight away.
-	function extractEmbedUrl( v ) {
-		v = ( v || '' ).trim();
-		var m = v.match( /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i );
-		return m ? m[ 1 ].trim() : v;
+	var Reference = window.ShootCalEmbedReference;
+	var importedQuery = {}, importedToken = '', requestSerial = 0;
+	function hosted() { return $( '#shootcal-gen-source' ).val() !== 'ical'; }
+	function quote( value ) {
+		return String( value ).replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /'/g, '&#39;' ).replace( /\[/g, '&#91;' ).replace( /\]/g, '&#93;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
 	}
-	function isShootCalEmbed( v ) {
-		return /(?:feed\.shootcal\.com\/[A-Za-z0-9_-]{8,}\.ics|api\.shootcal\.com\/embed\/[A-Za-z0-9_-]{8,})/i.test( v || '' );
+	function syncRows() {
+		var isHosted = hosted(), calendar = $( '#shootcal-gen-view' ).val() === 'calendar';
+		$( '.shootcal-gen-hosted-row' ).toggle( isHosted );
+		$( '.shootcal-gen-ical-row' ).toggle( ! isHosted );
+		$( '.shootcal-gen-months-row' ).toggle( ! isHosted || calendar );
+		$( '.shootcal-gen-availability-row' ).toggle( ! isHosted && $( '#shootcal-gen-mode' ).val() !== 'full' );
+		$( '#shootcal-generate' ).text( isHosted ? C.i18n.generate : C.i18n.checkGenerate );
 	}
-
-	function currentInputs() {
-		var url    = extractEmbedUrl( $( '#shootcal-gen-url' ).val() || '' );
-		var mode   = $( '#shootcal-gen-mode' ).val() || 'availability';
+	function normalizeReference() {
+		var field = $( '#shootcal-gen-calendar-id' ), parsed = Reference.parse( field.val() || '' );
+		if ( ! parsed ) return;
+		if ( field.val().trim() !== importedToken ) {
+			importedQuery = parsed.query;
+			importedToken = parsed.token;
+			$( '#shootcal-gen-view' ).val( parsed.query.view || 'default' );
+			$( '#shootcal-gen-months' ).val( parsed.query.months || '' );
+		}
+		field.val( parsed.token );
+		syncRows();
+	}
+	function inputs() {
 		var months = parseInt( $( '#shootcal-gen-months' ).val(), 10 );
-		months = ( isNaN( months ) || months < 1 ) ? '' : Math.min( 36, months );
-		var msd = $( '#shootcal-gen-msd' ).length ? $( '#shootcal-gen-msd' ).is( ':checked' ) : true;
-		var limitedColor = ( $( '#shootcal-gen-limited-color' ).val() || '' ).toLowerCase();
-		var bookedColor  = ( $( '#shootcal-gen-booked-color' ).val() || '' ).toLowerCase();
-		return { url: url, mode: mode, months: months, msd: msd, limitedColor: limitedColor, bookedColor: bookedColor };
+		months = isNaN( months ) || months < 1 ? '' : String( Math.min( 36, months ) );
+		if ( hosted() ) {
+			var value = $( '#shootcal-gen-calendar-id' ).val() || '', parsed = Reference.parse( value );
+			if ( ! parsed ) return null;
+			var query = Object.assign( {}, value.trim() === importedToken ? importedQuery : parsed.query );
+			var view = $( '#shootcal-gen-view' ).val();
+			if ( view === 'calendar' ) { query.view = 'calendar'; }
+			else { delete query.view; }
+			if ( months ) query.months = months; else delete query.months;
+			return { calendarId: parsed.token, query: Reference.cleanQuery( query ) };
+		}
+		var url = ( $( '#shootcal-gen-url' ).val() || '' ).trim();
+		try { var parsedUrl = new URL( url ); if ( ! /^https?:$/.test( parsedUrl.protocol ) || parsedUrl.username || parsedUrl.password || /[\s<>"'\\]/.test( url ) ) return null; } catch ( e ) { return null; }
+		return { url: url, mode: $( '#shootcal-gen-mode' ).val() || 'availability', months: months, msd: $( '#shootcal-gen-msd' ).is( ':checked' ), limited: $( '#shootcal-gen-limited-color' ).val(), booked: $( '#shootcal-gen-booked-color' ).val() };
 	}
-
-	function buildShortcode( v ) {
-		var sc = '[shootcal_web_calendar';
-		if ( 'full' === v.mode ) { sc += ' mode="full"'; }
-		sc += ' url="' + v.url + '"';
-		if ( v.months ) { sc += ' months="' + v.months + '"'; }
-		// Sessions-per-day + cell colors apply to availability mode only.
-		if ( 'availability' === v.mode ) {
-			// Default is on, so emit only when the user turned it off.
-			if ( ! v.msd ) { sc += ' multi_session_day="0"'; }
-			// Emit a color only when it differs from the built-in default.
-			if ( v.limitedColor && v.limitedColor !== DEFAULT_LIMITED ) { sc += ' limited_color="' + v.limitedColor + '"'; }
-			if ( v.bookedColor && v.bookedColor !== DEFAULT_BOOKED ) { sc += ' booked_color="' + v.bookedColor + '"'; }
+	function build( values ) {
+		var attrs = values.calendarId ? { calendar_id: values.calendarId } : { source: 'ical', url: values.url };
+		if ( values.calendarId ) Object.assign( attrs, values.query );
+		else {
+			if ( values.mode === 'full' ) attrs.mode = 'full';
+			if ( values.months ) attrs.months = values.months;
+			if ( values.mode !== 'full' ) {
+				if ( ! values.msd ) attrs.multi_session_day = '0';
+				if ( values.limited && values.limited !== '#fce3a8' ) attrs.limited_color = values.limited;
+				if ( values.booked && values.booked !== '#f6b9a3' ) attrs.booked_color = values.booked;
+			}
 		}
-		sc += ']';
-		return sc;
+		return '[shootcal_web_calendar' + Object.keys( attrs ).map( function ( key ) { return ' ' + key + '="' + quote( attrs[ key ] ) + '"'; } ).join( '' ) + ']';
 	}
-
-	// Availability-only rows (sessions-per-day + colors) hide in full mode.
-	function syncModeRows() {
-		var isAvail = ( $( '#shootcal-gen-mode' ).val() || 'availability' ) === 'availability';
-		$( '.shootcal-gen-availability-row' ).toggle( isAvail );
-	}
-
-	$( document ).on( 'click', '#shootcal-generate', function ( e ) {
-		e.preventDefault();
-		var $btn     = $( this );
-		var v        = currentInputs();
-		var $row     = $btn.closest( 'p' );
-		var $spinner = $row.find( '.spinner' );
-		var $result  = $row.find( '.shootcal-web-calendar__gen-result' );
-		var $output  = $( '#shootcal-gen-output' );
-
-		$result.removeClass( 'is-success is-error' ).text( '' );
-		if ( ! v.url ) {
-			$result.addClass( 'is-error' ).text( C.i18n.enterUrl );
-			return;
-		}
-
-		// ShootCal embed: no feed test (it serves HTML, not iCal). Build straight away.
-		if ( isShootCalEmbed( v.url ) ) {
-			$result.addClass( 'is-success' ).text( C.i18n.shootcalEmbed || '' );
-			$( '#shootcal-gen-shortcode' ).val( buildShortcode( v ) );
-			$output.show();
-			return;
-		}
-
-		$btn.prop( 'disabled', true );
-		$spinner.css( 'visibility', 'visible' );
-
-		$.post( C.ajaxUrl, { action: C.action, nonce: C.nonce, url: v.url } )
-			.done( function ( resp ) {
-				if ( resp && resp.success ) {
-					var msg = resp.data.message || '';
-					if ( resp.data.has_titles && 'full' !== v.mode ) {
-						msg += '  ' + C.i18n.fullHint;
-					}
-					$result.addClass( 'is-success' ).text( msg );
-					$( '#shootcal-gen-shortcode' ).val( buildShortcode( v ) );
-					$output.show();
-				} else {
-					var em = ( resp && resp.data && resp.data.message ) ? resp.data.message : C.i18n.networkError;
-					$result.addClass( 'is-error' ).text( em );
-					$output.hide();
-				}
-			} )
-			.fail( function () {
-				$result.addClass( 'is-error' ).text( C.i18n.networkError );
-				$output.hide();
-			} )
-			.always( function () {
-				$btn.prop( 'disabled', false );
-				$spinner.css( 'visibility', 'hidden' );
-			} );
+	$( document ).on( 'change', '#shootcal-gen-calendar-id', normalizeReference );
+	$( document ).on( 'change input', '#shootcal-gen-source, #shootcal-gen-calendar-id, #shootcal-gen-url, #shootcal-gen-view, #shootcal-gen-mode, #shootcal-gen-months, #shootcal-gen-msd, #shootcal-gen-limited-color, #shootcal-gen-booked-color', function () {
+		++requestSerial;
+		syncRows();
+		$( '#shootcal-gen-output' ).hide();
+		$( '.shootcal-web-calendar__gen-result' ).removeClass( 'is-success is-error' ).text( '' );
+		$( '#shootcal-gen-copy' ).text( C.i18n.copy );
 	} );
-
-	// Show/hide the availability-only rows when the mode changes.
-	$( document ).on( 'change', '#shootcal-gen-mode', syncModeRows );
-	$( syncModeRows );
-
-	// Keep the generated shortcode in sync if the user tweaks inputs afterward.
-	$( document ).on( 'change input', '#shootcal-gen-mode, #shootcal-gen-months, #shootcal-gen-url, #shootcal-gen-msd, #shootcal-gen-limited-color, #shootcal-gen-booked-color', function () {
-		var $output = $( '#shootcal-gen-output' );
-		if ( ! $output.is( ':visible' ) ) { return; }
-		var v = currentInputs();
-		if ( v.url ) { $( '#shootcal-gen-shortcode' ).val( buildShortcode( v ) ); }
+	$( document ).on( 'click', '#shootcal-generate', function ( event ) {
+		event.preventDefault();
+		if ( hosted() ) normalizeReference();
+		var values = inputs(), serial = ++requestSerial;
+		var result = $( '.shootcal-web-calendar__gen-result' ), output = $( '#shootcal-gen-output' );
+		result.removeClass( 'is-success is-error' ).text( '' ); output.hide();
+		if ( ! values ) { result.addClass( 'is-error' ).text( hosted() ? C.i18n.invalidId : C.i18n.enterUrl ); return; }
+		function show( message ) { result.addClass( 'is-success' ).text( message ); $( '#shootcal-gen-shortcode' ).val( build( values ) ); output.show(); }
+		if ( values.calendarId ) { show( C.i18n.shootcalEmbed ); return; }
+		var button = $( this ), spinner = button.closest( 'p' ).find( '.spinner' );
+		button.prop( 'disabled', true ); spinner.css( 'visibility', 'visible' );
+		$.post( C.ajaxUrl, { action: C.action, nonce: C.nonce, url: values.url } ).done( function ( response ) {
+			if ( serial !== requestSerial ) return;
+			if ( response && response.success ) {
+				var message = response.data.message || '';
+				if ( response.data.has_titles && values.mode !== 'full' ) message += ' ' + C.i18n.fullHint;
+				show( message );
+			} else result.addClass( 'is-error' ).text( response && response.data && response.data.message || C.i18n.networkError );
+		} ).fail( function () { if ( serial === requestSerial ) result.addClass( 'is-error' ).text( C.i18n.networkError ); } ).always( function () { button.prop( 'disabled', false ); spinner.css( 'visibility', 'hidden' ); } );
 	} );
-
-	$( document ).on( 'click', '#shootcal-gen-copy', function ( e ) {
-		e.preventDefault();
-		var field = document.getElementById( 'shootcal-gen-shortcode' );
-		if ( ! field ) { return; }
-		field.select();
-		try { document.execCommand( 'copy' ); } catch ( err ) {}
-		if ( window.navigator && window.navigator.clipboard ) {
-			window.navigator.clipboard.writeText( field.value ).catch( function () {} );
-		}
-		$( this ).text( C.i18n.copied );
+	$( document ).on( 'click', '#shootcal-gen-copy', function ( event ) {
+		event.preventDefault();
+		var field = document.getElementById( 'shootcal-gen-shortcode' ), button = $( this );
+		if ( ! field ) return;
+		function fallback() { field.select(); try { if ( document.execCommand( 'copy' ) ) button.text( C.i18n.copied ); } catch ( e ) {} }
+		if ( navigator.clipboard ) navigator.clipboard.writeText( field.value ).then( function () { button.text( C.i18n.copied ); }, fallback );
+		else fallback();
 	} );
+	$( syncRows );
 } )( jQuery );

@@ -32,19 +32,18 @@ defined( 'ABSPATH' ) || exit;
 
 class ICal_Parser {
 
-	/** Hard ceiling on occurrences generated per recurring event (safety net). */
-	private const MAX_OCCURRENCES = 750;
-
-	/** Iteration guard so a pathological rule can't loop forever. */
+	/** Safety net on work inside the requested window, never on series history. */
 	private const MAX_ITERATIONS = 20000;
 
 	/**
 	 * Parse iCal text into a flat array of Event objects.
 	 *
 	 * @param string $ical Raw iCal text.
+	 * @param \DateTimeImmutable|null $window_start First displayed day (inclusive).
+	 * @param \DateTimeImmutable|null $window_end First day after the display window.
 	 * @return Event[]
 	 */
-	public function parse( string $ical ): array {
+	public function parse( string $ical, ?\DateTimeImmutable $window_start = null, ?\DateTimeImmutable $window_end = null ): array {
 		$lines  = $this->unfold_lines( $ical );
 		$events = array();
 
@@ -59,7 +58,7 @@ class ICal_Parser {
 			}
 			if ( 'END:VEVENT' === $line ) {
 				$in_event = false;
-				foreach ( $this->build_events( $current ) as $built ) {
+				foreach ( $this->build_events( $current, $window_start, $window_end ) as $built ) {
 					$events[] = $built;
 				}
 				$current = array();
@@ -154,7 +153,7 @@ class ICal_Parser {
 	 * @param array<string, mixed> $props
 	 * @return Event[]
 	 */
-	private function build_events( array $props ): array {
+	private function build_events( array $props, ?\DateTimeImmutable $window_start, ?\DateTimeImmutable $window_end ): array {
 		$base = $this->build_base_event( $props );
 		if ( null === $base ) {
 			return array();
@@ -164,7 +163,7 @@ class ICal_Parser {
 		if ( ! isset( $props['RRULE'] ) || isset( $props['RECURRENCE-ID'] ) ) {
 			return array( $base );
 		}
-		$expanded = $this->expand_recurrence( $base, (string) $props['RRULE']['value'], $props );
+		$expanded = $this->expand_recurrence( $base, (string) $props['RRULE']['value'], $props, $window_start, $window_end );
 		if ( null === $expanded ) {
 			return array( $base ); // unsupported rule: at least the first instance
 		}
@@ -330,7 +329,7 @@ class ICal_Parser {
 	 * @param array<string, mixed> $props
 	 * @return Event[]|null
 	 */
-	private function expand_recurrence( Event $base, string $rrule, array $props ): ?array {
+	private function expand_recurrence( Event $base, string $rrule, array $props, ?\DateTimeImmutable $window_start, ?\DateTimeImmutable $window_end ): ?array {
 		$rule = $this->parse_rrule( $rrule );
 		if ( null === $rule ) {
 			return null;
@@ -340,27 +339,42 @@ class ICal_Parser {
 		$duration = $base->start->diff( $base->end );
 		$exdates  = $this->collect_exdate_keys( $props, $base->all_day, $tz );
 
-		// Bound expansion: never past UNTIL, never past ~37 months from now (one
-		// more than the 36-month display cap), and never more than MAX_OCCURRENCES.
-		// `floor` lets a long-running open-ended series skip its (irrelevant) past
-		// occurrences cheaply instead of burning the occurrence budget on history.
+		// The caller supplies the real rendered window, including adjacent-month
+		// cells. Keep the previous default horizon for existing parser callers.
 		$now     = new \DateTimeImmutable( 'now', $tz );
-		$horizon = $now->modify( '+37 months' );
-		$floor   = $now->modify( 'first day of this month' )->modify( '-1 month' )->setTime( 0, 0, 0 );
+		$horizon = $window_end ?? $now->modify( '+37 months' );
+		$floor   = $window_start ?? $now->modify( 'first day of this month' )->modify( '-1 month' )->setTime( 0, 0, 0 );
+		if ( $base->all_day ) {
+			// DATE values float: a display-zone midnight means that DATE, not the
+			// UTC instant on the preceding/following day.
+			$floor   = new \DateTimeImmutable( $floor->format( 'Y-m-d' ), $tz );
+			$horizon = new \DateTimeImmutable( $horizon->format( 'Y-m-d' ), $tz );
+		}
+		if ( $horizon <= $floor ) {
+			return array();
+		}
+		// Include occurrences that START before the window but still overlap it.
+		// DateInterval keeps wall-clock duration across DST; the extra two days
+		// cover timezone/short-month normalization when subtracting it.
+		$search_floor = $floor->sub( $duration )->modify( '-2 days' );
 
-		$starts = $this->generate_starts( $base->start, $rule, $floor, $horizon );
+		$starts = $this->generate_starts( $base->start, $rule, $search_floor, $horizon );
 
 		$out = array();
 		foreach ( $starts as $start ) {
-			$key = $base->all_day
-				? $start->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Ymd' )
-				: $start->setTimezone( $tz )->format( 'Ymd' );
-			// EXDATE-excluded occurrences are dropped here (they still counted
-			// toward COUNT in generate_starts, per RFC 5545).
-			if ( in_array( $key, $exdates, true ) ) {
+			$end = $start->add( $duration );
+			if ( $start >= $horizon
+				|| ( $end <= $floor && $start != $end )
+				|| ( $start == $end && $start < $floor ) ) {
 				continue;
 			}
-			$out[] = new Event( $start, $start->add( $duration ), $base->all_day, $base->summary );
+			$key = $base->all_day ? $start->format( 'Ymd' ) : $start->format( 'U' );
+			// EXDATE-excluded occurrences are dropped here (they still counted
+			// toward COUNT in generate_starts, per RFC 5545).
+			if ( isset( $exdates[ $key ] ) ) {
+				continue;
+			}
+			$out[] = new Event( $start, $end, $base->all_day, $base->summary );
 		}
 		return $out;
 	}
@@ -439,7 +453,7 @@ class ICal_Parser {
 
 	/**
 	 * Generate occurrence start datetimes in chronological order, bounded by the
-	 * rule's COUNT/UNTIL and the forward horizon (plus a hard safety cap). EXDATE
+	 * rule's COUNT/UNTIL and the requested window (plus a hard safety cap). EXDATE
 	 * filtering happens in the caller; per RFC 5545 excluded occurrences still
 	 * count toward COUNT, so they ARE generated here.
 	 *
@@ -453,19 +467,19 @@ class ICal_Parser {
 		$until    = $rule['until'];
 		$byday    = $rule['byday'];
 
-		$starts  = array();
-		$emitted = 0;
+		$starts = array();
+		if ( 0 === $count || $horizon <= $dtstart || ( null !== $until && $until < $floor ) ) {
+			return $starts;
+		}
 
 		$within = static function ( \DateTimeImmutable $occ ) use ( $until, $horizon ): bool {
 			if ( null !== $until && $occ > $until ) {
 				return false;
 			}
-			return $occ <= $horizon;
+			return $occ < $horizon;
 		};
-		// Past occurrences only matter when COUNT is set (they consume the count).
-		// For open-ended series, skipping them keeps the occurrence budget for the
-		// visible window.
-		$skippable_past = ( null === $count );
+		$local_floor   = $floor->setTimezone( $dtstart->getTimezone() );
+		$local_horizon = $horizon->setTimezone( $dtstart->getTimezone() );
 
 		if ( 'WEEKLY' === $freq && array() !== $byday ) {
 			$map     = array( 'MO' => 1, 'TU' => 2, 'WE' => 3, 'TH' => 4, 'FR' => 5, 'SA' => 6, 'SU' => 7 );
@@ -473,22 +487,32 @@ class ICal_Parser {
 			foreach ( $byday as $d ) {
 				$targets[] = $map[ $d ];
 			}
+			$targets = array_values( array_unique( $targets ) );
 			sort( $targets );
 
 			$h = (int) $dtstart->format( 'H' );
 			$i = (int) $dtstart->format( 'i' );
 			$s = (int) $dtstart->format( 's' );
 
-			$week   = 0;
+			$anchor = $dtstart->modify( 'monday this week' )->setTime( $h, $i, $s );
+			$days_to_floor = max( 0, $this->calendar_days_between( $anchor, $local_floor ) );
+			$days_to_end   = max( 0, $this->calendar_days_between( $anchor, $local_horizon ) );
+			$week = max( 0, intdiv( intdiv( $days_to_floor, 7 ), $interval ) - 1 );
+			$last_week = intdiv( intdiv( $days_to_end, 7 ), $interval );
+			// Count skipped candidates arithmetically, including the partial first
+			// week. COUNT is a limit on the series, not on visible/excluded results.
+			$first_week_count = count( array_filter( $targets, static fn( int $day ): bool => $day >= (int) $dtstart->format( 'N' ) ) );
+			$emitted = $week > 0 ? $first_week_count + ( $week - 1 ) * count( $targets ) : 0;
 			$safety = 0;
-			while ( $safety++ < self::MAX_ITERATIONS ) {
+			while ( $week <= $last_week && $safety++ < self::MAX_ITERATIONS ) {
+				if ( null !== $count && $emitted >= $count ) {
+					break;
+				}
 				// Monday of the dtstart week, advanced by whole INTERVAL weeks.
-				$week_start = $dtstart->modify( 'monday this week' )
+				$week_start = $anchor
 					->modify( '+' . ( $week * $interval ) . ' weeks' )
 					->setTime( $h, $i, $s );
 				++$week;
-
-				$week_after_end = ( $week_start > $horizon ) || ( null !== $until && $week_start > $until );
 
 				foreach ( $targets as $n ) {
 					$occ = $week_start->modify( '+' . ( $n - 1 ) . ' days' );
@@ -498,18 +522,13 @@ class ICal_Parser {
 					if ( ! $within( $occ ) ) {
 						continue;
 					}
-					if ( $skippable_past && $occ < $floor ) {
-						continue;
-					}
-					$starts[] = $occ;
 					++$emitted;
-					if ( ( null !== $count && $emitted >= $count ) || $emitted >= self::MAX_OCCURRENCES ) {
+					if ( $occ >= $floor ) {
+						$starts[] = $occ;
+					}
+					if ( null !== $count && $emitted >= $count ) {
 						return $starts;
 					}
-				}
-
-				if ( $week_after_end ) {
-					break;
 				}
 			}
 			return $starts;
@@ -526,9 +545,16 @@ class ICal_Parser {
 		)[ $freq ];
 		$anchor_day = (int) $dtstart->format( 'd' );
 
-		$n      = 0;
+		$periods_to_floor = $this->periods_between( $dtstart, $local_floor, $freq );
+		$periods_to_end   = $this->periods_between( $dtstart, $local_horizon, $freq );
+		$n = max( 0, intdiv( max( 0, $periods_to_floor ), $interval ) - 1 );
+		$last_n = intdiv( max( 0, $periods_to_end ), $interval );
+		$emitted = $this->count_prior_occurrences( $dtstart, $freq, $interval, $n );
 		$safety = 0;
-		while ( $safety++ < self::MAX_ITERATIONS ) {
+		while ( $n <= $last_n && $safety++ < self::MAX_ITERATIONS ) {
+			if ( null !== $count && $emitted >= $count ) {
+				break;
+			}
 			$occ = $dtstart->modify( '+' . ( $n * $interval ) . ' ' . $unit );
 			++$n;
 			if ( ! $within( $occ ) ) {
@@ -539,25 +565,73 @@ class ICal_Parser {
 			if ( ( 'MONTHLY' === $freq || 'YEARLY' === $freq ) && (int) $occ->format( 'd' ) !== $anchor_day ) {
 				continue;
 			}
-			if ( $skippable_past && $occ < $floor ) {
-				continue;
-			}
-			$starts[] = $occ;
 			++$emitted;
-			if ( ( null !== $count && $emitted >= $count ) || $emitted >= self::MAX_OCCURRENCES ) {
-				break;
+			if ( $occ >= $floor ) {
+				$starts[] = $occ;
 			}
 		}
 		return $starts;
 	}
 
+	/** Civil days, rather than 86400-second periods, preserve local time over DST. */
+	private function calendar_days_between( \DateTimeImmutable $start, \DateTimeImmutable $end ): int {
+		return (int) $start->setTime( 0, 0 )->diff( $end->setTime( 0, 0 ) )->format( '%r%a' );
+	}
+
+	private function periods_between( \DateTimeImmutable $start, \DateTimeImmutable $end, string $freq ): int {
+		if ( 'DAILY' === $freq || 'WEEKLY' === $freq ) {
+			$days = $this->calendar_days_between( $start, $end );
+			return 'WEEKLY' === $freq ? intdiv( $days, 7 ) : $days;
+		}
+		$years = (int) $end->format( 'Y' ) - (int) $start->format( 'Y' );
+		return 'YEARLY' === $freq ? $years : $years * 12 + (int) $end->format( 'n' ) - (int) $start->format( 'n' );
+	}
+
 	/**
-	 * Collect EXDATE day-keys (Ymd, in the event's reference timezone) for fast
-	 * exclusion lookup. All-day events key on the UTC date; timed events on the
-	 * event/display timezone date.
+	 * Count skipped valid instances without walking a decades-old series. Monthly
+	 * and yearly short-date skips repeat over the Gregorian 400-year cycle, so
+	 * at most 4800 cheap checkdate calls are needed, independent of series age.
+	 */
+	private function count_prior_occurrences( \DateTimeImmutable $start, string $freq, int $interval, int $periods ): int {
+		$day = (int) $start->format( 'j' );
+		if ( $periods === 0 || 'DAILY' === $freq || 'WEEKLY' === $freq || $day <= 28 ) {
+			return $periods;
+		}
+		$cycle = 'MONTHLY' === $freq ? 4800 : 400;
+		$a = $cycle;
+		$b = $interval % $cycle;
+		while ( $b > 0 ) {
+			[ $a, $b ] = array( $b, $a % $b );
+		}
+		$cycle = intdiv( $cycle, $a );
+		$valid = 0;
+		$remainder_valid = 0;
+		$limit = min( $periods, $cycle );
+		for ( $n = 0; $n < $limit; ++$n ) {
+			if ( 'MONTHLY' === $freq ) {
+				$month_index = ( (int) $start->format( 'Y' ) % 400 ) * 12 + (int) $start->format( 'n' ) - 1 + $n * ( $interval % 4800 );
+				$month = $month_index % 12 + 1;
+				$year = intdiv( $month_index, 12 ) % 400 + 2000;
+			} else {
+				$month = (int) $start->format( 'n' );
+				$year = ( (int) $start->format( 'Y' ) + $n * ( $interval % 400 ) ) % 400 + 2000;
+			}
+			if ( checkdate( $month, $day, $year ) ) {
+				++$valid;
+				if ( $n < $periods % $cycle ) {
+					++$remainder_valid;
+				}
+			}
+		}
+		return $periods < $cycle ? $valid : intdiv( $periods, $cycle ) * $valid + $remainder_valid;
+	}
+
+	/**
+	 * Collect EXDATE keys for fast exclusion lookup. DATE events use their
+	 * floating date; DATE-TIME events use the exact instant (TZID and UTC match).
 	 *
 	 * @param array<string, mixed> $props
-	 * @return string[]
+	 * @return array<string|int,true>
 	 */
 	private function collect_exdate_keys( array $props, bool $all_day, \DateTimeZone $tz ): array {
 		if ( empty( $props['__EXDATE'] ) || ! is_array( $props['__EXDATE'] ) ) {
@@ -582,9 +656,8 @@ class ICal_Parser {
 				if ( false === $dt ) {
 					continue;
 				}
-				$keys[] = $all_day
-					? $dt->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Ymd' )
-					: $dt->setTimezone( $tz )->format( 'Ymd' );
+				$key = $all_day ? $dt->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Ymd' ) : $dt->format( 'U' );
+				$keys[ $key ] = true;
 			}
 		}
 		return $keys;

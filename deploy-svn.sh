@@ -24,7 +24,7 @@ SVN_URL="https://plugins.svn.wordpress.org/$SLUG"
 # rsync excludes — keep dev/meta files out of the published package.
 EXCLUDES=(--exclude='.git' --exclude='.gitignore' --exclude='.github'
           --exclude='.wordpress-org' --exclude='.DS_Store' --exclude='*.zip'
-          --exclude='node_modules' --exclude='.svn' --exclude='*.sh')
+          --exclude='node_modules' --exclude='.svn' --exclude='*.sh' --exclude='tests')
 
 # --- version (single source of truth: the main file's const) ------------------
 VERSION=$(grep -oE "const VERSION[[:space:]]*=[[:space:]]*'[^']+'" "$SRC/$SLUG.php" \

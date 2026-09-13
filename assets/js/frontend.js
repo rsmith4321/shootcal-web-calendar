@@ -237,6 +237,7 @@
 		boxes.forEach( function ( box ) {
 			var body = new URLSearchParams();
 			body.set( 'action', 'shootcal_web_calendar_render' );
+			if ( box.dataset.shootcalPayload ) body.set( 'payload', box.dataset.shootcalPayload );
 			if ( box.dataset.shootcalUrl ) body.set( 'url', box.dataset.shootcalUrl );
 			if ( box.dataset.shootcalMode ) body.set( 'mode', box.dataset.shootcalMode );
 			if ( box.dataset.shootcalMonths ) body.set( 'months', box.dataset.shootcalMonths );

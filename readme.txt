@@ -3,124 +3,114 @@ Contributors: rsmith4321
 Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.1
-Requires PHP: 8.0
-Stable tag: 2.4.1
+Requires PHP: 8.1
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Companion plugin for the ShootCal app (Mac and iOS): paste your ShootCal embed to show your live availability calendar. Also renders any iCal feed.
+Connect your live ShootCal calendar with its ID, or display an iCal calendar from Google, Apple, Outlook, or another provider.
 
 == Description ==
 
-**Using the ShootCal app? Paste your embed - that is the main way.** ShootCal hands you a ready-made embed (an iframe snippet). Paste it into this plugin's block or shortcode and it just displays your live availability calendar - the same one shown on shootcal.com, including client self-booking. It stays current on its own and is immune to page caching, so there is nothing else to set up. (You can also paste that snippet straight into any builder's HTML / "Embed" block without this plugin at all; the plugin is the WordPress-native convenience.)
+**ShootCal: paste your calendar ID.** Add the ShootCal Web Calendar block, choose ShootCal, and paste the WordPress calendar ID from **ShootCal > Clients & Booking > Connect to website**. Your website displays the live ShootCal calendar or booking page. It automatically adjusts its height when visitors navigate or open booking forms, and follows updates made in ShootCal.
 
-**Other calendars work too.** Prefer to render on your own page, or not a ShootCal user? Paste any iCal (.ics) feed URL - Google, Apple, or Outlook - and the plugin draws a clean month grid itself, in availability or full-calendar mode. Those self-rendered calendars are what the Display settings, per-embed colors, and Page caching option apply to; a ShootCal embed carries its own and ignores them.
+Choose **Follow ShootCal settings** to show booking when enabled in your account, or **Calendar only** to always show the month calendar. Your ShootCal timezone, availability, and booking rules remain managed in ShootCal.
 
-**ShootCal Web Calendar is the companion plugin for the ShootCal scheduling app for Mac and iOS.** Publish your availability - or a full calendar - on your website straight from the calendar you already keep in ShootCal, which hides your personal events, builds each day's availability from your session types, and auto-detects your timezone. It also works with **any** iCal (.ics) feed - Google Calendar, Apple, or Outlook - so you can use it with or without ShootCal.
+**Other calendars: paste an iCal feed URL.** Choose Other calendar (iCal) for Google Calendar, Apple, Outlook, or another provider. WordPress fetches the feed on your server and draws a month grid, with either free/busy availability or event titles and times. Each block or shortcode can use a different calendar.
 
-Add it to any WordPress page or post in one of two modes. **Availability** mode shows which days are **available**, **limited**, or **booked** without ever exposing your event titles, locations, attendees, or descriptions. **Full calendar** mode shows each event's title and time on the grid - handy for a public schedule like sunrise/sunset times, office hours, or class times.
+**Existing embeds keep working.** The ShootCal ID field also accepts a ShootCal embed URL, feed URL, iframe snippet, or the official embed.js script snippet. Recognized references are converted into an ID and validated display options. Pasted JavaScript is never executed. Existing shortcodes and blocks using the url attribute remain supported.
 
-Built for photographers and other service providers who want to show clients when they can book, without manually updating a calendar on their website every week.
+= Why an ID instead of embed code? =
 
-= How it works =
+The plugin handles the embedded page and automatic resizing for you. It provides the same iframe and height-listener behavior as the ShootCal script embed, without requiring you to paste HTML or JavaScript into WordPress. The hosted calendar loads from ShootCal when visitors view it, independently of WordPress page caching.
 
-Each calendar's feed URL lives on the embed itself - the block's **Calendar feed URL** field, or the shortcode's `url` attribute - so different pages can show different calendars. In WP admin, **Settings > ShootCal Web Calendar** has a shortcode generator: paste a feed URL, pick a mode, and it checks the feed and hands you a ready-to-paste shortcode. Block users just add the "ShootCal Web Calendar" block and paste the URL in its sidebar.
+= Other iCal calendars =
 
-Any iCal feed works:
+* Google Calendar: Settings > Integrate calendar > Secret address in iCal format.
+* Apple, Outlook, and other providers: use the published HTTP or HTTPS iCal feed URL.
+* Availability mode shows Available, Limited, or Booked days and busy time windows. Event titles and descriptions are not displayed.
+* Full calendar mode displays event titles and start times. Use it only for information intended to be public.
+* Adjust months, week start, timezone, and availability colors in the block or shortcode. Settings > ShootCal Web Calendar contains site defaults for locally rendered feeds.
+* Feeds are cached for 10 minutes. Optional Page caching mode refreshes the rendered calendar after page load using a protected request that does not expose the private feed URL in the page markup.
 
-* **Google Calendar** - open your calendar's settings, scroll to **Integrate calendar**, and copy the **Secret address in iCal format**.
-* **Apple, Outlook, or other iCal feeds** - paste the feed's iCal URL.
-* **ShootCal app** (for ShootCal users) - open the Mac app, go to Settings > Website > Connect to your website, and click Copy URL. A ShootCal feed additionally hides your personal events, builds each day's availability from your session types, and auto-detects your timezone and how many months to show.
+= Privacy and external services =
 
-The plugin fetches the feed server-side, caches it for 10 minutes, and renders a clean month grid. In availability mode it keeps only busy start/end times and discards all event detail; in full calendar mode it shows the event titles and times.
+A ShootCal calendar ID is a public embed identifier, not your account password or API key. Visitors load the hosted page from **api.shootcal.com**; ShootCal therefore receives the normal browser request information, including the visitor's IP address. Booking forms send information entered by visitors directly to ShootCal. See ShootCal terms and privacy information at https://shootcal.com.
 
-= Privacy =
+For other iCal feeds, requests originate from your WordPress server and go to the provider you configure. The plugin stores the feed URL in your WordPress content and caches the raw feed in your site's object cache or database. Treat a private feed URL like a password and grant editing access only to trusted users. The plugin renders selected calendar information for visitors; it does not publish the private feed URL as part of the page-caching request.
 
-The plugin only reads the iCal feed server-side. The cached data lives in your WordPress site's object cache or database (transient) and is purged when you clear the cache or change settings.
+After upgrading, clear your full-page/CDN caches so old iCal placeholders are replaced with protected requests. Older versions exposed private iCal addresses in Page caching mode; if you used that mode with a private feed, replace its private address with your provider and update your embeds. ShootCal hosted calendar IDs are public and are not affected.
 
-The feed URL lives in the shortcode or block where you use it - treat it like a password. Note that **full calendar** mode intentionally displays event titles and times, so only point it at a feed whose contents are meant to be public.
-
-= Features =
-
-* Two display modes: availability (free/busy shading, no detail) or full calendar (event titles + times)
-* Per-embed feed URL (shortcode `url` or block field) plus a built-in shortcode generator - show different calendars on different pages
-* Works with any iCal feed: Google Calendar, Apple, Outlook, or a ShootCal app feed
-* Month grid showing up to 36 months ahead, with previous / today / next navigation and keyboard arrows
-* Available / Limited / Booked status per day, with booked time windows shown on Limited days and a color legend
-* Tap-to-expand booking times, plus a tap indicator on phones
-* Per-embed Limited / Booked day colors (availability mode) and Sunday or Monday week start (the display timezone follows your WordPress site setting)
-* Optional "Page caching" mode that loads the calendar via JavaScript so it stays fresh behind Varnish or page-cache plugins
-* Privacy-first, accessible markup (ARIA grid, keyboard nav, AA contrast), and assets that load only on pages that use the calendar
+Google Calendar is provided by Google: https://policies.google.com/terms and https://policies.google.com/privacy. For Apple, Outlook, and other feeds, consult the selected provider's terms and privacy policy. No calendar requests are made until you configure a source.
 
 == Installation ==
 
-1. Upload the plugin to `/wp-content/plugins/` or install through the WordPress Plugins screen, then Activate.
-2. Embed the calendar one of these ways (recommended first):
+1. Install and activate ShootCal Web Calendar. Requires WordPress 6.4 or later and PHP 8.1 or later.
+2. Add the **ShootCal Web Calendar** block to a page or post.
+3. Choose **ShootCal** and paste your calendar ID, or choose **Other calendar (iCal)** and paste the feed URL.
+4. Preview the page to verify the calendar before publishing.
 
-   * **Block editor (recommended):** insert the "ShootCal Web Calendar" block, then in its sidebar choose the display mode and paste the **Calendar feed URL**. The editor shows a compact placeholder; the calendar renders on the published page.
-   * **Shortcode:** go to **Settings > ShootCal Web Calendar**, use the **shortcode generator** (paste a feed URL, pick a mode, generate), and paste the result into a Shortcode block. Example: `[shootcal_web_calendar url="https://example.com/feed.ics"]`.
-   * **Inline shortcode in a Paragraph block:** works, but do not apply inline-code formatting (Cmd/Ctrl+E) to the shortcode text, or WordPress wraps the output in `<code>`. The plugin defends against this in CSS, but the patterns above are safer.
+For the classic editor or a page builder that accepts shortcodes, use the generator under **Settings > ShootCal Web Calendar** and paste its result into a Shortcode block or the builder's shortcode field.
 
 == Frequently Asked Questions ==
 
-= Where do I find my calendar URL? =
+= Do I need the plugin to use ShootCal on WordPress? =
 
-For Google Calendar: open the calendar's three-dot menu > **Settings and sharing** > scroll to **Integrate calendar** > copy **Secret address in iCal format**. For ShootCal: open the Mac app > Settings > Website > Connect to your website > Copy URL. Apple, Outlook, and other apps also publish iCal URLs you can paste.
+No. You can also paste ShootCal's script snippet into a suitable Custom HTML or Embed block. The plugin adds an ID field, a dedicated block, shortcode support, and optional rendering of other iCal feeds.
 
-= What does a ShootCal feed add over a plain calendar? =
+= Can I paste my existing iframe or script code? =
 
-A ShootCal feed (from the ShootCal Mac app) hides your personal events, builds each day's availability from your session types, and auto-detects your timezone and how many months to show. Any other iCal feed simply shows busy days.
+Yes. Paste it into the ShootCal calendar ID field. The plugin accepts the official ShootCal iframe src, embed.js data-src, and embed.js data-shootcal formats. Existing saved URL-based embeds remain supported. Booking-page IDs from a /book/ URL are different from calendar IDs and are not accepted as calendar embed references.
 
-= Can I show multiple calendars merged together? =
+= Does it support recurring events from iCal feeds? =
 
-Not yet. Planned for a future release.
+The local renderer expands common daily, weekly, monthly, and yearly recurrence rules, including intervals, counts, end dates, weekly weekdays, and excluded dates. Advanced rules such as the second Monday of each month fall back to their first occurrence. Check a representative range of dates before relying on an external feed for availability. Hosted ShootCal embeds use the calendar supplied by ShootCal.
 
-= Does it support recurring events? =
+= How do multiple calendars work? =
 
-Yes. Some feeds (like Google Calendar) pre-expand recurring events; for feeds that don't (such as Apple or Outlook), the plugin expands the common recurrence rules itself - daily, weekly, monthly, and yearly, including interval, count, end date, weekly by-weekday, and excluded dates - so a recurring booking shows on every occurrence within the visible window. Unusual rules (for example "the second Monday of each month") fall back to showing the first occurrence.
-
-= How fresh is the data? =
-
-The feed is cached for 10 minutes. You can force an immediate refresh from the settings page. If your site uses full-page caching, turn on "Page caching" mode so the calendar is fetched fresh on each visit instead of being frozen in the cached page.
+Add a separate block or shortcode for each calendar. Each embedded ShootCal frame resizes independently. Calendars are displayed separately; merging feeds is not supported.
 
 == Shortcode attributes ==
 
-* `url` - the iCal (.ics) feed URL to display (required).
-* `mode` - "availability" (free/busy shading, default) or "full" (show event titles + times).
-* `multi_session_day` - availability mode only. "1" (default): a day with only timed sessions shows as "Limited". "0": any event marks the whole day "Booked".
-* `limited_color` - availability mode only. Hex color (e.g. #fce3a8) for the "Limited" day shading. Default: the built-in soft gold.
-* `booked_color` - availability mode only. Hex color (e.g. #f6b9a3) for the "Booked" day shading. Default: the built-in soft coral.
-* `months` - how many months to display (1-36). Default: setting value (auto-detected for ShootCal feeds).
-* `first_day` - "0" for Sunday, "1" for Monday. Default: setting value.
-* `timezone` - IANA timezone override for this embed. Default: your WordPress site timezone (or, for a ShootCal feed, the feed's own).
+ShootCal example: `[shootcal_web_calendar calendar_id="YOUR_CALENDAR_ID"]`
 
-Example: `[shootcal_web_calendar mode="full" url="https://example.com/feed.ics" months="3"]`
+Calendar-only example: `[shootcal_web_calendar calendar_id="YOUR_CALENDAR_ID" view="calendar"]`
 
-Tip: build a shortcode under Settings > ShootCal Web Calendar - paste a feed URL, pick a mode, and it validates the feed and outputs the shortcode for you.
+Other iCal example: `[shootcal_web_calendar source="ical" url="https://example.com/calendar.ics" mode="availability" months="12"]`
 
-== External Services ==
+* `calendar_id` - ShootCal's public calendar/embed ID. Recommended for ShootCal.
+* `source` - Optional: shootcal or ical. Omit to detect existing URL-based embeds automatically.
+* `url` - An iCal feed URL, or a legacy ShootCal embed reference. Existing usage remains supported.
+* `view` - ShootCal only: default follows ShootCal settings; calendar always shows the month calendar.
+* `months` - Calendar display range, 1-36. Leave unset for the calendar default.
+* `first_day` - Calendar week start: 0 for Sunday, 1 for Monday.
+* `mode` - availability (default) or full. Full shows event titles and times from an iCal feed.
+* `timezone` - Local iCal renderer only: an IANA identifier, such as America/New_York. Defaults to your WordPress site timezone.
+* `multi_session_day` - Local availability renderer only: 1 (default) shows timed bookings as Limited; 0 marks a day with any booking as Booked.
+* `limited_color`, `booked_color` - Local availability renderer only: optional hex colors.
 
-This plugin reads a calendar from the iCal feed URL(s) you put in your shortcodes or blocks. Each request is made from your web server (not your visitor's browser) whenever a month grid is rendered and the 10 minute cache has expired. The plugin only ever contacts the URLs you configure; with none set, it makes no external requests. Only the request itself is sent - no data from your site or your visitors is transmitted. In availability mode the plugin keeps only busy start/end times, discarding titles, locations, attendees, and descriptions; in full calendar mode it also keeps event titles and times (by design, to display them).
-
-The service contacted depends on the URL you use:
-
-**Google Calendar**
-
-If you use a Google Calendar secret iCal address, the request goes to Google's calendar servers (calendar.google.com). This service is provided by Google. See Google's Terms of Service (https://policies.google.com/terms) and Privacy Policy (https://policies.google.com/privacy).
-
-**ShootCal**
-
-If you use a ShootCal feed URL from the ShootCal Mac app, the request goes to the ShootCal feed service (feed.shootcal.com). This service is provided by Ryan Smith Photography. See the terms and privacy information at https://shootcal.com.
-
-**Other iCal feeds**
-
-If you use any other iCal URL (for example from Apple or Outlook), the request goes to whichever service hosts that feed. Refer to that provider's own terms and privacy policy.
+Imported ShootCal URLs retain validated presentation parameters for compatibility. Their appearance follows the options currently supported by the hosted ShootCal page. Local iCal display settings do not change hosted ShootCal booking rules.
 
 == Screenshots ==
 
-1. The availability month grid on a page. Open days are uncolored, gold marks Limited days (with the booked time windows shown), and coral marks fully Booked days. A legend below the grid explains the colors.
+1. A calendar embedded in a WordPress page.
+
+== Upgrade Notice ==
+
+= 2.5.0 =
+Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches after upgrading. If you used a private iCal URL with Page caching, replace that URL with your provider.
 
 == Changelog ==
+
+= 2.5.0 =
+* Connect ShootCal using a calendar ID in the block or shortcode generator.
+* Import existing ShootCal URLs, iframe snippets, and official script snippets without executing pasted code.
+* Add separate ShootCal and other iCal source choices, with relevant display controls for each.
+* Preserve supported ShootCal embed presentation options and resize repeated embeds independently.
+* Protect private iCal feed URLs in page-caching requests.
+* Correct the minimum supported PHP version to 8.1.
+* Keep recurring and long-running iCal events accurate across the full displayed month grids.
+* Preserve explicit Sunday week starts when Page caching is enabled.
 
 = 2.4.1 =
 * Verified compatibility with WordPress 7.1. No functional changes.

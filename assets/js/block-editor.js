@@ -1,171 +1,78 @@
-/* ShootCal Web Calendar - block editor script (vanilla JS, no build).
- *
- * Registers the `shootcal-web-calendar/calendar` block. The editor view shows a
- * static placeholder card with a Calendar URL field (paste a feed right into the
- * block, like the core Embed block) - NOT a live render. The frontend stylesheet
- * isn't loaded in the editor, so a server render of the real grid collapses into
- * an unstyled list; and re-rendering the live feed on every keystroke is
- * wasteful. The actual calendar is emitted by the PHP render callback on the
- * published page.
- *
- * No JSX, no bundler. Uses createElement directly so the file can be loaded as
- * a normal script with the WP global script handles as dependencies.
- */
+/* ShootCal block editor. Pasted references are data, never executable markup. */
 ( function ( wp ) {
 	'use strict';
-
-	var registerBlockType = wp.blocks.registerBlockType;
-	var el                = wp.element.createElement;
-	var Fragment          = wp.element.Fragment;
-	var useBlockProps      = wp.blockEditor.useBlockProps;
-	var InspectorControls  = wp.blockEditor.InspectorControls;
-	var PanelColorSettings = wp.blockEditor.PanelColorSettings;
-	var PanelBody          = wp.components.PanelBody;
-	var Placeholder       = wp.components.Placeholder;
-	var TextControl       = wp.components.TextControl;
-	var SelectControl     = wp.components.SelectControl;
-	var ToggleControl     = wp.components.ToggleControl;
-	var __                = wp.i18n.__;
-
-	// Let people paste exactly what ShootCal hands them: if a full <iframe ...>
-	// snippet is pasted, lift the src URL out so we store a clean URL. A bare URL
-	// (ShootCal or any other iCal feed) passes through unchanged.
-	function extractEmbedUrl( v ) {
-		v = ( v || '' ).trim();
-		var m = v.match( /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i );
-		return m ? m[ 1 ].trim() : v;
-	}
-
-	registerBlockType( 'shootcal-web-calendar/calendar', {
+	var el = wp.element.createElement, __ = wp.i18n.__, Reference = window.ShootCalEmbedReference;
+	var TextControl = wp.components.TextControl, SelectControl = wp.components.SelectControl;
+	var PanelBody = wp.components.PanelBody, ToggleControl = wp.components.ToggleControl;
+	wp.blocks.registerBlockType( 'shootcal-web-calendar/calendar', {
 		edit: function ( props ) {
-			var attributes    = props.attributes;
-			var setAttributes = props.setAttributes;
-			var blockProps    = useBlockProps();
-
-			var monthsValue = ( attributes.months !== undefined && attributes.months !== null )
-				? String( attributes.months )
-				: '';
-			var firstDayValue = ( attributes.firstDay === 1 ) ? '1' : '0';
-			var timezoneValue = attributes.timezone || '';
-			var modeValue     = ( attributes.mode === 'full' ) ? 'full' : 'availability';
-			var urlValue      = attributes.url || '';
-			var multiSessionDayValue = ( attributes.multiSessionDay === false ) ? false : true;
-			var limitedColorValue = attributes.limitedColor || '';
-			var bookedColorValue  = attributes.bookedColor || '';
-
-			// Per-embed cell colors apply to availability mode only. Empty = the
-			// built-in defaults (soft gold / coral); the server falls back when unset.
-			var colorPanel = ( modeValue === 'availability' ) ? el( PanelColorSettings, {
-				title: __( 'Availability colors', 'shootcal-web-calendar' ),
-				initialOpen: false,
-				colorSettings: [
-					{
-						label: __( 'Limited day color', 'shootcal-web-calendar' ),
-						value: limitedColorValue || undefined,
-						onChange: function ( v ) { setAttributes( { limitedColor: v || '' } ); }
-					},
-					{
-						label: __( 'Booked day color', 'shootcal-web-calendar' ),
-						value: bookedColorValue || undefined,
-						onChange: function ( v ) { setAttributes( { bookedColor: v || '' } ); }
-					}
-				]
-			} ) : null;
-
-			var sidebar = el( InspectorControls, null,
-				el( PanelBody, { title: __( 'Calendar source', 'shootcal-web-calendar' ), initialOpen: true },
-					el( SelectControl, {
-						label: __( 'Display mode', 'shootcal-web-calendar' ),
-						help: __( 'Availability shows free/busy shading only. Full calendar shows each event title and time.', 'shootcal-web-calendar' ),
-						value: modeValue,
-						options: [
-							{ label: __( 'Availability (free/busy)', 'shootcal-web-calendar' ), value: 'availability' },
-							{ label: __( 'Full calendar (show events)', 'shootcal-web-calendar' ), value: 'full' }
-						],
-						onChange: function ( v ) {
-							setAttributes( { mode: ( v === 'full' ) ? 'full' : 'availability' } );
-						}
-					} ),
-					el( TextControl, {
-						label: __( 'ShootCal embed or calendar feed', 'shootcal-web-calendar' ),
-						help: __( 'Paste your ShootCal embed - the <iframe> snippet or its URL - to show your live availability calendar (the main way). Other iCal (.ics) feeds, e.g. Google, Apple, or Outlook, also work as a URL. Treat it like a password.', 'shootcal-web-calendar' ),
-						type: 'text',
-						value: urlValue,
-						onChange: function ( v ) {
-							setAttributes( { url: extractEmbedUrl( v ) } );
-						}
-					} ),
-					( modeValue === 'availability' ) ? el( ToggleControl, {
-						label: __( 'I can take more than one booking per day', 'shootcal-web-calendar' ),
-						help: __( 'On: a day with timed sessions (and no all-day event) shows as "Limited" - partly booked, still open. Off: the first booking marks the whole day "Booked".', 'shootcal-web-calendar' ),
-						checked: multiSessionDayValue,
-						onChange: function ( v ) {
-							setAttributes( { multiSessionDay: !! v } );
-						}
-					} ) : null
+			var a = props.attributes, set = props.setAttributes;
+			var reference = Reference.parse( a.calendarId || a.url || '' );
+			var source = a.source === 'ical' ? 'ical' : a.source === 'shootcal' || a.calendarId || reference || ! a.url ? 'shootcal' : 'ical';
+			var hosted = source === 'shootcal';
+			var query = reference ? reference.query : {};
+			query = hosted ? Object.assign( {}, query, Reference.cleanQuery( a.embedParams || {} ) ) : {};
+			var view = a.embedView || query.view || 'default';
+			var mode = a.mode === 'full' ? 'full' : 'availability';
+			var value = hosted ? a.calendarId || a.url || '' : a.url || '';
+			function updateOptions( change ) {
+				if ( hosted && reference && ! a.calendarId ) change = Object.assign( { calendarId: reference.token, url: '', embedParams: query }, change );
+				set( change );
+			}
+			function setReference( input ) {
+				var parsed = Reference.parse( input );
+				if ( ! parsed ) { set( { source: 'shootcal', calendarId: input, url: '' } ); return; }
+				var change = { source: 'shootcal', calendarId: parsed.token, url: '' };
+				if ( input.trim() !== parsed.token ) {
+					change.embedParams = parsed.query;
+					change.embedView = parsed.query.view;
+					change.theme = parsed.query.theme;
+					change.months = parsed.query.months ? Number( parsed.query.months ) : undefined;
+					change.firstDay = parsed.query.first_day !== undefined ? Number( parsed.query.first_day ) : undefined;
+					change.mode = parsed.query.mode || 'availability';
+				}
+				set( change );
+			}
+			var sourceControl = el( SelectControl, {
+				label: __( 'Calendar source', 'shootcal-web-calendar' ), value: source,
+				options: [ { label: __( 'ShootCal', 'shootcal-web-calendar' ), value: 'shootcal' }, { label: __( 'Other calendar (iCal)', 'shootcal-web-calendar' ), value: 'ical' } ],
+				onChange: function ( next ) { set( { source: next } ); }
+			} );
+			var referenceControl = el( TextControl, {
+				label: hosted ? __( 'ShootCal calendar ID', 'shootcal-web-calendar' ) : __( 'iCal feed URL', 'shootcal-web-calendar' ),
+				help: hosted ? __( 'ShootCal: Clients & Booking > Connect to website. Existing ShootCal URLs, iframe snippets, and script snippets also work.', 'shootcal-web-calendar' ) : __( 'Paste an HTTP or HTTPS iCal feed URL from Google, Apple, Outlook, or another provider. Treat private feed URLs like passwords.', 'shootcal-web-calendar' ),
+				type: hosted ? 'text' : 'url', value: value, autoComplete: 'off', spellCheck: false,
+				onChange: hosted ? setReference : function ( input ) { set( { source: 'ical', url: input.trim() } ); }
+			} );
+			var monthsValue = a.months !== undefined ? String( a.months ) : query.months || '';
+			var firstDayValue = a.firstDay !== undefined ? String( a.firstDay ) : query.first_day || '';
+			var calendarOptions = ! hosted || view === 'calendar' ? el( PanelBody, { title: __( 'Calendar options', 'shootcal-web-calendar' ), initialOpen: false },
+				el( TextControl, { label: __( 'Months to show', 'shootcal-web-calendar' ), help: __( 'Leave blank to use the calendar default.', 'shootcal-web-calendar' ), type: 'number', min: 1, max: 36, value: monthsValue,
+					onChange: function ( input ) { var number = parseInt( input, 10 ), params = Object.assign( {}, query ); delete params.months; updateOptions( { months: isNaN( number ) || number < 1 ? undefined : Math.min( 36, number ), embedParams: params } ); } } ),
+				el( SelectControl, { label: __( 'First day of week', 'shootcal-web-calendar' ), value: firstDayValue,
+					options: [ { label: __( 'Calendar default', 'shootcal-web-calendar' ), value: '' }, { label: __( 'Sunday', 'shootcal-web-calendar' ), value: '0' }, { label: __( 'Monday', 'shootcal-web-calendar' ), value: '1' } ],
+					onChange: function ( input ) { var params = Object.assign( {}, query ); delete params.first_day; updateOptions( { firstDay: input === '' ? undefined : Number( input ), embedParams: params } ); } } ),
+				! hosted ? el( TextControl, { label: __( 'Timezone override', 'shootcal-web-calendar' ), help: __( 'Leave blank for your WordPress site timezone, or enter an IANA identifier such as America/New_York.', 'shootcal-web-calendar' ), value: a.timezone || '', onChange: function ( input ) { set( { timezone: input.trim() } ); } } ) : null
+			) : null;
+			var sidebar = el( wp.blockEditor.InspectorControls, null,
+				el( PanelBody, { title: __( 'Calendar source', 'shootcal-web-calendar' ), initialOpen: true }, sourceControl, referenceControl,
+					hosted ? el( SelectControl, { label: __( 'ShootCal display', 'shootcal-web-calendar' ), value: view,
+						help: __( 'Follow ShootCal settings shows booking when enabled. Calendar only always shows the month calendar.', 'shootcal-web-calendar' ),
+						options: [ { label: __( 'Follow ShootCal settings', 'shootcal-web-calendar' ), value: 'default' }, { label: __( 'Calendar only', 'shootcal-web-calendar' ), value: 'calendar' } ],
+						onChange: function ( next ) { updateOptions( { embedView: next } ); } } ) : el( SelectControl, { label: __( 'Display mode', 'shootcal-web-calendar' ), value: mode,
+						options: [ { label: __( 'Availability (free/busy)', 'shootcal-web-calendar' ), value: 'availability' }, { label: __( 'Full calendar (show events)', 'shootcal-web-calendar' ), value: 'full' } ], onChange: function ( next ) { set( { mode: next } ); } } ),
+					! hosted && mode === 'availability' ? el( ToggleControl, { label: __( 'I can take more than one booking per day', 'shootcal-web-calendar' ), help: __( 'On: timed sessions show as Limited. Off: the first booking marks the whole day Booked.', 'shootcal-web-calendar' ), checked: a.multiSessionDay !== false, onChange: function ( next ) { set( { multiSessionDay: !! next } ); } } ) : null
 				),
-				colorPanel,
-				el( PanelBody, { title: __( 'Calendar overrides', 'shootcal-web-calendar' ), initialOpen: false },
-					el( TextControl, {
-						label: __( 'Months to show', 'shootcal-web-calendar' ),
-						help: __( 'Leave blank to use the plugin default. ShootCal sources auto-detect from the feed.', 'shootcal-web-calendar' ),
-						type: 'number',
-						min: 1,
-						max: 36,
-						value: monthsValue,
-						onChange: function ( v ) {
-							var n = parseInt( v, 10 );
-							setAttributes( { months: isNaN( n ) || n <= 0 ? undefined : n } );
-						}
-					} ),
-					el( SelectControl, {
-						label: __( 'First day of week', 'shootcal-web-calendar' ),
-						value: firstDayValue,
-						options: [
-							{ label: __( 'Sunday', 'shootcal-web-calendar' ), value: '0' },
-							{ label: __( 'Monday', 'shootcal-web-calendar' ), value: '1' }
-						],
-						onChange: function ( v ) {
-							setAttributes( { firstDay: ( v === '1' ) ? 1 : 0 } );
-						}
-					} ),
-					el( TextControl, {
-						label: __( 'Timezone override', 'shootcal-web-calendar' ),
-						help: __( 'IANA identifier, e.g. America/New_York. Leave blank to auto-detect from the feed.', 'shootcal-web-calendar' ),
-						value: timezoneValue,
-						onChange: function ( v ) {
-							setAttributes( { timezone: ( v || '' ).trim() } );
-						}
-					} )
-				)
+				! hosted && mode === 'availability' ? el( wp.blockEditor.PanelColorSettings, { title: __( 'Availability colors', 'shootcal-web-calendar' ), initialOpen: false,
+					colorSettings: [ { label: __( 'Limited day color', 'shootcal-web-calendar' ), value: a.limitedColor || undefined, onChange: function ( next ) { set( { limitedColor: next || '' } ); } }, { label: __( 'Booked day color', 'shootcal-web-calendar' ), value: a.bookedColor || undefined, onChange: function ( next ) { set( { bookedColor: next || '' } ); } } ] } ) : null,
+				calendarOptions
 			);
-
-			// Override summary shown under the URL field.
-			var summaryBits = [];
-			summaryBits.push( ( modeValue === 'full' ) ? __( 'Mode: Full calendar', 'shootcal-web-calendar' ) : __( 'Mode: Availability', 'shootcal-web-calendar' ) );
-			summaryBits.push( urlValue ? __( 'Source: set', 'shootcal-web-calendar' ) : __( 'Source: paste your ShootCal embed', 'shootcal-web-calendar' ) );
-			summaryBits.push( monthsValue ? __( 'Months: ', 'shootcal-web-calendar' ) + monthsValue : __( 'Months: default', 'shootcal-web-calendar' ) );
-			summaryBits.push( ( firstDayValue === '1' ) ? __( 'Week starts Monday', 'shootcal-web-calendar' ) : __( 'Week starts Sunday', 'shootcal-web-calendar' ) );
-			summaryBits.push( timezoneValue ? __( 'Timezone: ', 'shootcal-web-calendar' ) + timezoneValue : __( 'Timezone: auto', 'shootcal-web-calendar' ) );
-
-			// Static placeholder. The live calendar only renders on the published
-			// page; the calendar source is configured once under Settings.
-			var preview = el( 'div', blockProps,
-				el( Placeholder, {
-					icon: 'calendar-alt',
-					label: __( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
-					instructions: __( 'Your calendar renders here on the published page. Paste your ShootCal embed (the <iframe> snippet or its URL) in the block settings on the right. Other iCal feeds work there too.', 'shootcal-web-calendar' )
-				},
-					el( 'p', { style: { margin: 0, fontSize: '12px', color: '#646970' } }, summaryBits.join( '  •  ' ) )
-				)
-			);
-
-			return el( Fragment, null, sidebar, preview );
+			var preview = el( 'div', wp.blockEditor.useBlockProps(), el( wp.components.Placeholder, {
+				icon: 'calendar-alt', label: __( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
+				instructions: hosted ? __( 'Your live ShootCal calendar adjusts its height automatically. Preview the page to see it.', 'shootcal-web-calendar' ) : __( 'WordPress displays your iCal calendar here. Preview the page to see it.', 'shootcal-web-calendar' )
+			}, referenceControl, hosted && value && ! reference ? el( 'p', { role: 'alert' }, __( 'Enter a valid ShootCal calendar ID or a ShootCal embed reference.', 'shootcal-web-calendar' ) ) : null ) );
+			return el( wp.element.Fragment, null, sidebar, preview );
 		},
-
-		// Server-rendered: save() returns null and the render callback emits HTML on the frontend.
-		save: function () {
-			return null;
-		}
+		save: function () { return null; }
 	} );
 } )( window.wp );

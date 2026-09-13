@@ -63,15 +63,27 @@ final class Event {
 	 * as `Y-m-d` strings. Used to bucket events into per-day lists so the
 	 * grid renderer does O(1) lookups instead of O(events) per cell.
 	 *
+	 * Optional bounds are display-calendar dates, with an exclusive end. Clamp
+	 * before walking days so a long event that began years ago still covers the
+	 * visible window. Callers without bounds retain the historical 1000-day cap.
+	 *
 	 * @return string[]
 	 */
-	public function days_covered( \DateTimeZone $display_tz ): array {
+	public function days_covered( \DateTimeZone $display_tz, ?\DateTimeImmutable $window_start = null, ?\DateTimeImmutable $window_end = null ): array {
 		$out = array();
-		// Hard cap on emitted day-keys (~2.7 years). The feed horizon maxes
-		// at 24 months; without this a malformed/hostile VEVENT (e.g.
-		// DTSTART 1970 / DTEND 2099) would expand to tens of thousands of
-		// iterations per event — a feed-driven CPU/memory DoS.
-		$max = 1000;
+		if ( $this->end < $this->start ) {
+			return $out;
+		}
+		$first_day = $window_start?->setTimezone( $display_tz )->setTime( 0, 0, 0 );
+		$after_last_day = $window_end?->setTimezone( $display_tz )->setTime( 0, 0, 0 );
+		if ( null !== $first_day && null !== $after_last_day && $first_day >= $after_last_day ) {
+			return $out;
+		}
+		// The full, caller-bounded display window can exceed 1000 days (36 months).
+		// Unbounded callers retain a safety net against hostile century-long data.
+		$max = null !== $first_day && null !== $after_last_day
+			? (int) $first_day->diff( $after_last_day )->format( '%a' )
+			: 1000;
 
 		if ( $this->all_day ) {
 			$utc        = new \DateTimeZone( 'UTC' );
@@ -81,6 +93,12 @@ final class Event {
 			$last       = \DateTimeImmutable::createFromFormat( '!Y-m-d', $end_date, $utc );
 			if ( false === $cursor || false === $last ) {
 				return array();
+			}
+			if ( null !== $first_day ) {
+				$cursor = max( $cursor, new \DateTimeImmutable( $first_day->format( 'Y-m-d' ), $utc ) );
+			}
+			if ( null !== $after_last_day ) {
+				$last = min( $last, new \DateTimeImmutable( $after_last_day->format( 'Y-m-d' ), $utc ) );
 			}
 			while ( $cursor < $last && count( $out ) < $max ) {
 				$out[]  = $cursor->format( 'Y-m-d' );
@@ -93,13 +111,19 @@ final class Event {
 		$end_local   = $this->end->setTimezone( $display_tz );
 
 		$cursor = $start_local->setTime( 0, 0, 0 );
-		while ( $cursor < $end_local && count( $out ) < $max ) {
+		if ( null !== $first_day ) {
+			$cursor = max( $cursor, $first_day );
+		}
+		$last = null !== $after_last_day ? min( $end_local, $after_last_day ) : $end_local;
+		while ( $cursor < $last && count( $out ) < $max ) {
 			$out[]  = $cursor->format( 'Y-m-d' );
 			$cursor = $cursor->modify( '+1 day' );
 		}
 		// A zero-duration event at exactly the start of a day would otherwise
 		// produce no buckets; emit one entry for the day it falls on so it still renders.
-		if ( $out === array() && $start_local == $end_local ) {
+		if ( $out === array() && $start_local == $end_local
+			&& ( null === $first_day || $start_local >= $first_day )
+			&& ( null === $after_last_day || $start_local < $after_last_day ) ) {
 			$out[] = $start_local->format( 'Y-m-d' );
 		}
 		return $out;
