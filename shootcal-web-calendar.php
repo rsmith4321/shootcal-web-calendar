@@ -3,7 +3,7 @@
  * Plugin Name:       ShootCal Web Calendar
  * Plugin URI:        https://shootcal.com
  * Description:       Connect a live ShootCal calendar with its ID, or display another iCal feed as availability or a full calendar. Automatic embed resizing, shortcode, and block support.
- * Version:           2.5.0
+ * Version:           2.5.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Ryan Smith
@@ -11,7 +11,6 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       shootcal-web-calendar
- * Domain Path:       /languages
  *
  * @package ShootCalWebCalendar
  */
@@ -22,7 +21,7 @@ namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '2.5.0';
+const VERSION     = '2.5.1';
 const SLUG        = 'shootcal-web-calendar';
 const OPTION_KEY  = 'shootcal_web_calendar_options';
 const CACHE_KEY   = 'shootcal_web_calendar_ical';
@@ -60,9 +59,11 @@ function bootstrap(): void {
 	// files, so the manual call is unnecessary (Plugin Check flags it).
 
 	( new Settings() )->register();
+	( new Admin_Menu() )->register();
 	( new Shortcode() )->register();
 	( new Block() )->register();
 	( new Assets() )->register();
+	( new Compatibility() )->register();
 
 	// Updates are delivered exclusively through the WordPress.org plugin
 	// directory; there is no bundled self-updater.

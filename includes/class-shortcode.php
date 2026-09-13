@@ -59,6 +59,9 @@ class Shortcode {
 	private function render_shootcal_embed( array $atts, string $token, array $url_query = array() ): string {
 		// Explicit block/shortcode choices override imported URL presentation.
 		$params = Embed_Reference::parameters( array_merge( $url_query, $atts ) );
+		if ( ! isset( $params['months'] ) ) {
+			$params['months'] = '12';
+		}
 		$src = Embed_Reference::url( $token, $params );
 		wp_enqueue_script( 'shootcal-web-calendar-embed' );
 		return '<div class="shootcal-web-calendar-embed" style="width:100%">'
@@ -97,6 +100,7 @@ class Shortcode {
 		$booked    = ( 'availability' === $mode && ! empty( $atts['booked_color'] ) )  ? (string) sanitize_hex_color( (string) $atts['booked_color'] )  : '';
 		$payload = Feed_Payload::encode( array(
 			'url' => $url, 'mode' => $mode, 'months' => $months,
+			'source' => 'ical' === ( $atts['source'] ?? '' ) ? 'ical' : 'auto',
 			'first_day' => $first_day, 'timezone' => $timezone,
 			'multi_session_day' => $msd, 'limited_color' => $limited, 'booked_color' => $booked,
 		) );
@@ -187,6 +191,7 @@ class Shortcode {
 
 		$atts = shortcode_atts(
 			array(
+				'source'      => 'auto',
 				// Months is resolved after we know the source (below); blank means
 				// "use the setting / auto-detect from the feed".
 				'months'      => '',
@@ -225,6 +230,7 @@ class Shortcode {
 		// feed URLs survive. Block attributes are stored clean and unaffected.
 		$active_url = esc_url_raw( trim( html_entity_decode( (string) $atts['url'], ENT_QUOTES ) ) );
 		$source     = $this->source_for_url( $active_url );
+		$auto_months = 'shootcal' === $source && 'ical' !== $atts['source'];
 
 		$attr_months  = (int) $atts['months']; // 0 if empty / not provided
 		$first_dow    = ( 1 === (int) $atts['first_day'] ) ? 1 : 0;
@@ -277,7 +283,7 @@ class Shortcode {
 		}
 
 		$range_start = ( new \DateTimeImmutable( 'first day of this month', $tz ) )->setTime( 0, 0, 0 );
-		$parse_months = $attr_months > 0 ? min( 36, $attr_months ) : ( 'shootcal' === $source ? 36 : (int) $opts['months_ahead'] );
+		$parse_months = $attr_months > 0 ? min( 36, $attr_months ) : ( $auto_months ? 36 : (int) $opts['months_ahead'] );
 		$range_end = $range_start->modify( '+' . max( 1, $parse_months ) . ' months' );
 		// Month grids include adjacent-month cells; retain their busy dates too.
 		$leading = ( (int) $range_start->format( 'w' ) - $first_dow + 7 ) % 7;
@@ -292,11 +298,11 @@ class Shortcode {
 		$window_start = $today->modify( 'first day of this month' )->setTime( 0, 0, 0 );
 
 		// Determine months_ahead:
-		//   - Google source: settings value, capped by `months` attr if provided.
-		//   - ShootCal source: auto-detect from latest event in the feed (start of
+		//   - Explicit iCal or other feeds: chosen months, otherwise saved setting.
+		//   - Legacy auto-detected ShootCal feed: latest event in the feed (start of
 		//     current month -> month containing the last event), capped by `months`
 		//     attr if provided. Falls back to 3 months for an empty feed.
-		if ( 'shootcal' === $source ) {
+		if ( $auto_months ) {
 			$months_ahead = $this->auto_detect_months( $events, $window_start, $tz );
 			if ( $attr_months > 0 ) {
 				$months_ahead = min( $months_ahead, $attr_months );

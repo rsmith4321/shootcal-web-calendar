@@ -14,6 +14,13 @@ assert.equal(frames[1].style.height, '811px');
 assert.equal(frames[0].style.height, undefined);
 message(frames[0].contentWindow, {shootcalEmbed: 1, height: 450});
 assert.equal(frames[0].style.height, '450px');
+// Session grid -> selected session -> All sessions: the child must be able to
+// grow back after the shorter booking view without resizing another instance.
+for (const height of [812, 742, 812]) {
+  message(frames[0].contentWindow, {shootcalEmbed: 1, height});
+  assert.equal(frames[0].style.height, height + 'px');
+  assert.equal(frames[1].style.height, '811px');
+}
 for (const height of [Infinity, NaN, -10, 0, 20001, '810']) message(frames[1].contentWindow, {shootcalEmbed: 1, height});
 message({}, {shootcalEmbed: 1, height: 1000});
 message(frames[1].contentWindow, {shootcalEmbed: 1, height: 1000}, 'https://evil.example');

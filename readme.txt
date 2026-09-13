@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.5.0
+Stable tag: 2.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,7 +30,7 @@ The plugin handles the embedded page and automatic resizing for you. It provides
 * Apple, Outlook, and other providers: use the published HTTP or HTTPS iCal feed URL.
 * Availability mode shows Available, Limited, or Booked days and busy time windows. Event titles and descriptions are not displayed.
 * Full calendar mode displays event titles and start times. Use it only for information intended to be public.
-* Adjust months, week start, timezone, and availability colors in the block or shortcode. Settings > ShootCal Web Calendar contains site defaults for locally rendered feeds.
+* Adjust months, week start, timezone, and availability colors in the block or shortcode. ShootCal > Calendar contains site defaults for locally rendered feeds.
 * Feeds are cached for 10 minutes. Optional Page caching mode refreshes the rendered calendar after page load using a protected request that does not expose the private feed URL in the page markup.
 
 = Privacy and external services =
@@ -50,7 +50,7 @@ Google Calendar is provided by Google: https://policies.google.com/terms and htt
 3. Choose **ShootCal** and paste your calendar ID, or choose **Other calendar (iCal)** and paste the feed URL.
 4. Preview the page to verify the calendar before publishing.
 
-For the classic editor or a page builder that accepts shortcodes, use the generator under **Settings > ShootCal Web Calendar** and paste its result into a Shortcode block or the builder's shortcode field.
+For the classic editor or a page builder that accepts shortcodes, use the generator under **ShootCal > Calendar** and paste its result into a Shortcode block or the builder's shortcode field.
 
 == Frequently Asked Questions ==
 
@@ -70,6 +70,14 @@ The local renderer expands common daily, weekly, monthly, and yearly recurrence 
 
 Add a separate block or shortcode for each calendar. Each embedded ShootCal frame resizes independently. Calendars are displayed separately; merging feeds is not supported.
 
+= Do I need to exclude the calendar in my performance plugin? =
+
+Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize receive automatic exclusions for this plugin's frontend stylesheet and calendar startup scripts, including the official standalone ShootCal embed loader. The inline calendar configuration is protected with its script. This keeps dynamically loaded calendar styles available and prevents startup from waiting for a visitor's first interaction. Existing optimizer settings and other files are preserved.
+
+Clear generated/used CSS and page/CDN caches once after updating so old optimized pages are regenerated. The exclusions are supplied through each optimizer's filters and may not appear in its saved settings fields. They do not override an explicit Script Manager rule that unloads the plugin entirely.
+
+For other optimizers, exclude `/shootcal-web-calendar/assets/css/frontend.css` from unused-CSS removal, and exclude `/shootcal-web-calendar/assets/js/`, `ShootCalWebCalendarFront`, and `api.shootcal.com/embed.js` from script delays or combination. Hosted ShootCal content has its own stylesheet inside the iframe.
+
 == Shortcode attributes ==
 
 ShootCal example: `[shootcal_web_calendar calendar_id="YOUR_CALENDAR_ID"]`
@@ -82,7 +90,7 @@ Other iCal example: `[shootcal_web_calendar source="ical" url="https://example.c
 * `source` - Optional: shootcal or ical. Omit to detect existing URL-based embeds automatically.
 * `url` - An iCal feed URL, or a legacy ShootCal embed reference. Existing usage remains supported.
 * `view` - ShootCal only: default follows ShootCal settings; calendar always shows the month calendar.
-* `months` - Calendar display range, 1-36. Leave unset for the calendar default.
+* `months` - Calendar display range, 1-36. ShootCal defaults to 12; other iCal feeds use your saved calendar default (initially 12). Imported month counts are preserved.
 * `first_day` - Calendar week start: 0 for Sunday, 1 for Monday.
 * `mode` - availability (default) or full. Full shows event titles and times from an iCal feed.
 * `timezone` - Local iCal renderer only: an IANA identifier, such as America/New_York. Defaults to your WordPress site timezone.
@@ -97,10 +105,21 @@ Imported ShootCal URLs retain validated presentation parameters for compatibilit
 
 == Upgrade Notice ==
 
+= 2.5.1 =
+Adds automatic performance-plugin exclusions and a 12-month ShootCal default. Clear generated CSS and page/CDN caches once after updating.
+
 = 2.5.0 =
 Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches after upgrading. If you used a private iCal URL with Page caching, replace that URL with your provider.
 
 == Changelog ==
+
+= 2.5.1 =
+* Automatically protect calendar styles and startup scripts in Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize.
+* Group Calendar and Social Feed under one ShootCal sidebar menu while preserving existing settings links.
+* Include the official standalone ShootCal embed script and the calendar's inline configuration in script exclusions.
+* Default new ShootCal calendars to 12 months while preserving chosen and imported month counts.
+* Replace manual optimization warnings with guidance describing automatic support.
+* Add a branded calendar setup panel with a direct link to Clients & Booking in ShootCal.
 
 = 2.5.0 =
 * Connect ShootCal using a calendar ID in the block or shortcode generator.

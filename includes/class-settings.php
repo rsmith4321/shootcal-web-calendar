@@ -18,6 +18,9 @@ class Settings {
 	private const NONCE_CLEAR_CACHE  = 'shootcal_web_calendar_clear_cache';
 	private const AJAX_TEST_HOOK     = 'shootcal_web_calendar_test_connection';
 
+	/** @var array<string> */
+	private array $page_hooks = array();
+
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
@@ -27,13 +30,24 @@ class Settings {
 	}
 
 	public function add_menu(): void {
-		add_options_page(
+		// Retain old bookmarked settings URLs without a duplicate sidebar entry.
+		$legacy_hook = add_options_page(
 			__( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
 			__( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
 		);
+		remove_submenu_page( 'options-general.php', self::PAGE_SLUG );
+		$page_hook = add_submenu_page(
+			'shootcal',
+			__( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
+			Admin_Menu::item_label( __( 'Calendar', 'shootcal-web-calendar' ), 'dashicons-calendar-alt' ),
+			'manage_options',
+			self::PAGE_SLUG,
+			array( $this, 'render_page' )
+		);
+		$this->page_hooks = array_values( array_filter( array( $legacy_hook, $page_hook ), 'is_string' ) );
 	}
 
 	public function register_settings(): void {
@@ -135,22 +149,17 @@ class Settings {
 		esc_html_e( 'Turn this on if your site uses full-page caching (e.g. Varnish or a page-cache plugin). The page itself stays cached, but the calendar is fetched fresh on each visit, so availability never gets stuck behind a long page cache. Leave off otherwise.', 'shootcal-web-calendar' );
 		echo '</p>';
 
-		// Used-CSS optimizers (Perfmatters, WP Rocket, etc.) scan the page
-		// HTML to decide which CSS to keep. In this mode the calendar is
-		// injected by JavaScript AFTER the page loads, so its styles aren't
-		// in the scanned HTML and can get stripped, leaving the calendar
-		// unstyled. Surface the fix right where the mode is enabled.
+		// Explain the automatic compatibility hooks beside the dynamic renderer.
 		if ( ! empty( $opts['ajax_render'] ) ) {
-			echo '<div class="notice notice-warning inline" style="margin:10px 0 0;"><p style="margin:.5em 0;">';
-			echo '<strong>' . esc_html__( 'Using a "Remove Unused CSS" optimizer?', 'shootcal-web-calendar' ) . '</strong><br />';
+			echo '<p class="description">';
+			esc_html_e( 'Calendar styles and scripts are automatically excluded from incompatible optimization in Perfmatters, WP Rocket, LiteSpeed Cache, and Autoptimize. Clear generated CSS and page caches once after updating.', 'shootcal-web-calendar' );
+			echo ' ';
 			printf(
 				/* translators: %s: the plugin directory path to add to the CSS exclusion list. */
-				esc_html__( 'If you use Perfmatters, WP Rocket, or another tool that removes unused CSS, add %s to its stylesheet exclusion list. In this mode the calendar loads via JavaScript, so the optimizer doesn\'t see its styles in the page HTML and may strip them, leaving the calendar unstyled.', 'shootcal-web-calendar' ),
+				esc_html__( 'For other optimizers, exclude %s from unused-CSS removal and script delays.', 'shootcal-web-calendar' ),
 				'<code>/shootcal-web-calendar/</code>'
 			);
-			echo '<br />';
-			echo esc_html__( 'Perfmatters: Options > Assets > Used CSS > Excluded Stylesheets. WP Rocket: File Optimization > Reduce Unused CSS > CSS Safelist. After adding it, clear/regenerate the used CSS and your page cache.', 'shootcal-web-calendar' );
-			echo '</p></div>';
+			echo '</p>';
 		}
 	}
 
@@ -218,7 +227,7 @@ class Settings {
 				</tr>
 				<tr class="shootcal-gen-months-row">
 					<th scope="row"><label for="shootcal-gen-months"><?php esc_html_e( 'Months to show', 'shootcal-web-calendar' ); ?></label></th>
-					<td><input type="number" id="shootcal-gen-months" class="small-text" min="1" max="36" /><span class="description"><?php esc_html_e( 'Optional. Leave blank to use the calendar default.', 'shootcal-web-calendar' ); ?></span></td>
+					<td><input type="number" id="shootcal-gen-months" class="small-text" min="1" max="36" value="12" /><span class="description"><?php esc_html_e( 'Defaults to 12 months.', 'shootcal-web-calendar' ); ?></span></td>
 				</tr>
 			</table>
 			<p><button type="button" class="button button-primary" id="shootcal-generate"><?php esc_html_e( 'Generate shortcode', 'shootcal-web-calendar' ); ?></button><span class="spinner" style="float:none; margin-left:6px;"></span><span class="shootcal-web-calendar__gen-result" aria-live="polite"></span></p>
@@ -249,7 +258,7 @@ class Settings {
 		wp_safe_redirect(
 			add_query_arg(
 				array( 'page' => self::PAGE_SLUG, 'cache_cleared' => '1' ),
-				admin_url( 'options-general.php' )
+				admin_url( 'admin.php' )
 			)
 		);
 		exit;
@@ -258,7 +267,7 @@ class Settings {
 	// --- Admin assets + AJAX test handler --------------------------------
 
 	public function enqueue_admin_assets( string $hook ): void {
-		if ( 'settings_page_' . self::PAGE_SLUG !== $hook ) {
+		if ( ! in_array( $hook, $this->page_hooks, true ) ) {
 			return;
 		}
 		wp_enqueue_style( 'shootcal-web-calendar-admin', PLUGIN_URL . 'assets/css/admin.css', array(), VERSION );
@@ -268,6 +277,7 @@ class Settings {
 			'shootcal-web-calendar-admin',
 			'ShootCalWebCalendar',
 			array(
+				'monthsDefault' => (int) self::get_options()['months_ahead'],
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'action'  => self::AJAX_TEST_HOOK,
 				'nonce'   => wp_create_nonce( self::AJAX_TEST_HOOK ),

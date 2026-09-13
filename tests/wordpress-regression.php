@@ -31,6 +31,12 @@ $hosted = do_shortcode( '[shootcal_web_calendar calendar_id="'.$id.'" view="cale
 scwc_assert( str_contains( $hosted, 'data-shootcal-embed' ) && str_contains( $hosted, 'view=calendar' ) && str_contains( $hosted, 'theme=dark' ), 'ID shortcode renders chosen hosted view' );
 scwc_assert( ! str_contains( $hosted, '<script' ) && ! str_contains( $hosted, ' id=' ), 'Hosted output needs neither pasted scripts nor duplicated DOM IDs' );
 scwc_assert( wp_script_is( 'shootcal-web-calendar-embed', 'enqueued' ), 'Hosted resize script is enqueued' );
+scwc_assert( str_contains( $hosted, 'months=12' ), 'Bare ShootCal ID defaults to 12 months' );
+$six_months = $url . '?view=calendar&months=6';
+scwc_assert( str_contains( $shortcode->render( array( 'url' => $six_months ) ), 'months=6' ), 'Imported hosted month count survives default' );
+scwc_assert( str_contains( $shortcode->render( array( 'url' => $six_months, 'months' => '4' ) ), 'months=4' ), 'Explicit shortcode month count overrides imported month count' );
+scwc_assert( str_contains( ( new \ShootCalWebCalendar\Block() )->render( array( 'calendarId' => $id ) ), 'months=12' ), 'Block bare ID matches the editor 12 month default' );
+scwc_assert( str_contains( ( new \ShootCalWebCalendar\Block() )->render( array( 'url' => $six_months ) ), 'months=6' ), 'Legacy block URL month count survives default' );
 $imported = $shortcode->render( array( 'url' => $script ) );
 scwc_assert( str_contains( $imported, 'first_day=1' ) && str_contains( $imported, 'view=calendar' ), 'Legacy script input preserves presentation in render' );
 
@@ -41,6 +47,7 @@ $switched = ( new \ShootCalWebCalendar\Block() )->render( array('source'=>'ical'
 preg_match('/data-shootcal-payload="([^"]+)"/', $switched, $switched_match);
 $switched_attributes = \ShootCalWebCalendar\Feed_Payload::decode( html_entity_decode($switched_match[1] ?? '', ENT_QUOTES) );
 scwc_assert( 'availability' === $switched_attributes['mode'], 'Switching from hosted to iCal does not carry over full-event mode' );
+scwc_assert( 'ical' === $switched_attributes['source'], 'Explicit iCal source survives the encrypted AJAX payload' );
 $lazy = $shortcode->render( array( 'source'=>'ical', 'url'=>$private_url, 'mode'=>'availability', 'first_day'=>'0' ) );
 scwc_assert( ! str_contains( $lazy, $private_url ) && ! str_contains( $lazy, 'SCWC_REVIEW_SECRET' ), 'Private feed URL is absent from public markup' );
 preg_match( '/data-shootcal-payload="([^"]+)"/', $lazy, $match );
@@ -85,4 +92,20 @@ remove_filter( 'wp_die_handler', $die_handler );
 remove_filter( 'wp_die_ajax_handler', $die_handler );
 remove_filter( 'pre_http_request', $fixture_http, 10 );
 remove_filter( 'pre_option_shootcal_web_calendar_options', $options );
+
+// Explicit iCal uses the chosen horizon even on a ShootCal feed host. An empty
+// feed must not shrink a six-month site default or a four-month embed to three.
+$ical_url = 'https://feed.shootcal.com/MonthsFixture_20260913.ics';
+$month_options = static fn() => array( 'ajax_render'=>false, 'months_ahead'=>6, 'first_day_of_week'=>1, 'show_credit'=>true );
+$empty_feed = static function( $response, $args, $requested_url ) use ( $ical_url ) {
+	return $ical_url !== $requested_url ? $response : array( 'response'=>array('code'=>200), 'headers'=>array(), 'body'=>"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n" );
+};
+add_filter( 'pre_option_shootcal_web_calendar_options', $month_options );
+add_filter( 'pre_http_request', $empty_feed, 10, 3 );
+$six_month_feed = $shortcode->render( array( 'source'=>'ical', 'url'=>$ical_url ) );
+scwc_assert( str_contains( $six_month_feed, 'data-shootcal-total="6"' ), 'Explicit iCal preserves the saved month default on an empty ShootCal feed' );
+$four_month_feed = $shortcode->render( array( 'source'=>'ical', 'url'=>$ical_url, 'months'=>'4' ) );
+scwc_assert( str_contains( $four_month_feed, 'data-shootcal-total="4"' ), 'Explicit iCal chosen month count is not shortened to the last event' );
+remove_filter( 'pre_http_request', $empty_feed, 10 );
+remove_filter( 'pre_option_shootcal_web_calendar_options', $month_options );
 echo "All WordPress regression checks passed.\n";

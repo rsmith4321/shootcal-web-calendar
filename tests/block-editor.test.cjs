@@ -11,7 +11,10 @@ const wp = {
   blockEditor: { InspectorControls: 'InspectorControls', PanelColorSettings: 'PanelColorSettings', useBlockProps: () => ({}) },
   components: Object.fromEntries(['TextControl','SelectControl','PanelBody','ToggleControl','Placeholder'].map(name => [name,name]))
 };
-vm.runInNewContext(fs.readFileSync(require.resolve('../assets/js/block-editor.js'), 'utf8'), {window: {wp, ShootCalEmbedReference:Reference}});
+function loadEditor(monthsDefault = 12) {
+  vm.runInNewContext(fs.readFileSync(require.resolve('../assets/js/block-editor.js'), 'utf8'), {window: {wp, ShootCalEmbedReference:Reference, ShootCalWebCalendarBlock:{monthsDefault}}});
+}
+loadEditor();
 function editor(attributes) {
   let update;
   const tree=registration.edit({attributes, setAttributes: value => { update=value; }});
@@ -39,12 +42,21 @@ assert.ok(generic.inlineFind('Calendar source'));
 assert.ok(generic.inlineFind('iCal feed URL'));
 assert.equal(generic.sidebarFind('iCal feed URL'),undefined);
 assert.ok(generic.find('Timezone override'));
+assert.equal(generic.find('Months to show').props.value,'12');
 const token='FixtureCalendar_123';
+assert.equal(editor({calendarId:token,embedView:'calendar'}).find('Months to show').props.value,'12');
+assert.equal(editor({calendarId:token,embedView:'calendar',months:4}).find('Months to show').props.value,'4');
+assert.equal(editor({url:'https://api.shootcal.com/embed/'+token+'?view=calendar&months=6'}).find('Months to show').props.value,'6');
+loadEditor(9);
+assert.equal(editor({source:'ical',url:'https://example.com/feed.ics'}).find('Months to show').props.value,'9');
+assert.equal(editor({calendarId:token,embedView:'calendar'}).find('Months to show').props.value,'12');
+loadEditor();
 const legacy=editor({url:'https://api.shootcal.com/embed/'+token+'?view=calendar&theme=dark&months=12&first_day=1&sc_card=abcdef'});
 assert.equal(legacy.find('Calendar theme'),undefined);
 assert.equal(legacy.find('Months to show').props.value,'12');
 legacy.find('Months to show').props.onChange('');
 assert.deepEqual(legacy.update(),{calendarId:token,url:'',embedParams:{first_day:'1',view:'calendar',theme:'dark',sc_card:'abcdef'}});
+assert.equal(editor(legacy.update()).find('Months to show').props.value,'12');
 const imported=editor({source:'shootcal'});
 imported.find('ShootCal calendar ID').props.onChange('<script src="https://api.shootcal.com/embed.js" data-src="https://api.shootcal.com/embed/'+token+'?view=calendar&amp;theme=dark&amp;first_day=1"></script>');
 assert.deepEqual(imported.update(),{source:'shootcal',calendarId:token,url:'',embedParams:{first_day:'1',view:'calendar',theme:'dark'},embedView:'calendar',theme:'dark',firstDay:1,mode:'availability'});

@@ -1,0 +1,46 @@
+/* Calendar setup panel. Loaded only inside the block editor. */
+.shootcal-web-calendar__editor {
+	box-sizing: border-box;
+	padding: clamp(16px, 3vw, 24px);
+	border: 1px solid #dce1e6;
+	border-radius: 12px;
+	background: #fff;
+	color: #1e293b;
+	box-shadow: 0 2px 8px rgb(15 23 42 / 5%);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.shootcal-web-calendar__editor-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 22px;
+}
+.shootcal-web-calendar__editor .shootcal-web-calendar__editor-logo {
+	width: 44px;
+	height: 44px;
+	flex: 0 0 44px;
+	border-radius: 10px;
+}
+.shootcal-web-calendar__editor-header h3 {
+	margin: 0 0 3px;
+	font: 600 18px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	color: #1e293b;
+}
+.shootcal-web-calendar__editor-header p,
+.shootcal-web-calendar__editor .shootcal-web-calendar__editor-hint {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #596574;
+}
+.shootcal-web-calendar__editor-fields { width: 100%; min-width: 0; }
+.shootcal-web-calendar__editor-fields .components-base-control { margin-bottom: 16px; }
+.shootcal-web-calendar__editor .shootcal-web-calendar__editor-link {
+	gap: 6px;
+	margin: 0 0 18px;
+	border-radius: 6px;
+	font-size: 13px;
+	text-decoration: none;
+}
+.shootcal-web-calendar__editor .components-base-control__help { font-size: 12px; line-height: 1.5; }
+.shootcal-web-calendar__editor .shootcal-web-calendar__editor-hint { padding-top: 2px; }

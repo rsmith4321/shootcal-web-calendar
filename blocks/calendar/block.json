@@ -2,7 +2,7 @@
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
 	"name": "shootcal-web-calendar/calendar",
-	"version": "2.5.0",
+	"version": "2.5.1",
 	"title": "ShootCal Web Calendar",
 	"category": "widgets",
 	"icon": "calendar-alt",
@@ -90,5 +90,6 @@
 			"type": "object"
 		}
 	},
-	"editorScript": "shootcal-web-calendar-block-editor"
+	"editorScript": "shootcal-web-calendar-block-editor",
+	"editorStyle": "file:../../assets/css/editor.css"
 }

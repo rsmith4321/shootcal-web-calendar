@@ -44,6 +44,11 @@ class Block {
 			true
 		);
 		wp_set_script_translations( self::EDITOR_SCRIPT, 'shootcal-web-calendar' );
+		wp_localize_script( self::EDITOR_SCRIPT, 'ShootCalWebCalendarBlock', array(
+			'monthsDefault' => (int) Settings::get_options()['months_ahead'],
+			'logoUrl' => PLUGIN_URL . 'assets/img/shootcal-logo.svg',
+			'bookingSettingsUrl' => 'https://app.shootcal.com/app/clients/booking',
+		) );
 
 		register_block_type(
 			PLUGIN_DIR . 'blocks/calendar',

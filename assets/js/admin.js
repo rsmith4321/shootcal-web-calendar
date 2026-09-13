@@ -3,13 +3,15 @@
 	'use strict';
 	var C = window.ShootCalWebCalendar || { i18n: {} };
 	var Reference = window.ShootCalEmbedReference;
-	var importedQuery = {}, importedToken = '', requestSerial = 0;
+	var importedQuery = {}, importedToken = '', requestSerial = 0, monthsChosen = false, viewChosen = false;
 	function hosted() { return $( '#shootcal-gen-source' ).val() !== 'ical'; }
+	function defaultMonths() { return hosted() ? 12 : Math.max( 1, Math.min( 36, Number( C.monthsDefault ) || 12 ) ); }
 	function quote( value ) {
 		return String( value ).replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /'/g, '&#39;' ).replace( /\[/g, '&#91;' ).replace( /\]/g, '&#93;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
 	}
 	function syncRows() {
 		var isHosted = hosted(), calendar = $( '#shootcal-gen-view' ).val() === 'calendar';
+		if ( ! monthsChosen ) $( '#shootcal-gen-months' ).val( defaultMonths() );
 		$( '.shootcal-gen-hosted-row' ).toggle( isHosted );
 		$( '.shootcal-gen-ical-row' ).toggle( ! isHosted );
 		$( '.shootcal-gen-months-row' ).toggle( ! isHosted || calendar );
@@ -22,15 +24,19 @@
 		if ( field.val().trim() !== importedToken ) {
 			importedQuery = parsed.query;
 			importedToken = parsed.token;
-			$( '#shootcal-gen-view' ).val( parsed.query.view || 'default' );
-			$( '#shootcal-gen-months' ).val( parsed.query.months || '' );
+			if ( parsed.query.view || ! viewChosen ) $( '#shootcal-gen-view' ).val( parsed.query.view || 'default' );
+			if ( parsed.query.view ) viewChosen = true;
+			if ( parsed.query.months ) {
+				$( '#shootcal-gen-months' ).val( parsed.query.months );
+				monthsChosen = true;
+			}
 		}
 		field.val( parsed.token );
 		syncRows();
 	}
 	function inputs() {
 		var months = parseInt( $( '#shootcal-gen-months' ).val(), 10 );
-		months = isNaN( months ) || months < 1 ? '' : String( Math.min( 36, months ) );
+		months = String( isNaN( months ) || months < 1 ? defaultMonths() : Math.min( 36, months ) );
 		if ( hosted() ) {
 			var value = $( '#shootcal-gen-calendar-id' ).val() || '', parsed = Reference.parse( value );
 			if ( ! parsed ) return null;
@@ -62,6 +68,8 @@
 	$( document ).on( 'change', '#shootcal-gen-calendar-id', normalizeReference );
 	$( document ).on( 'change input', '#shootcal-gen-source, #shootcal-gen-calendar-id, #shootcal-gen-url, #shootcal-gen-view, #shootcal-gen-mode, #shootcal-gen-months, #shootcal-gen-msd, #shootcal-gen-limited-color, #shootcal-gen-booked-color', function () {
 		++requestSerial;
+		if ( this.id === 'shootcal-gen-months' ) monthsChosen = Number( $( this ).val() ) > 0;
+		if ( this.id === 'shootcal-gen-view' ) viewChosen = true;
 		syncRows();
 		$( '#shootcal-gen-output' ).hide();
 		$( '.shootcal-web-calendar__gen-result' ).removeClass( 'is-success is-error' ).text( '' );
