@@ -15,23 +15,29 @@ vm.runInNewContext(fs.readFileSync(require.resolve('../assets/js/block-editor.js
 function editor(attributes) {
   let update;
   const tree=registration.edit({attributes, setAttributes: value => { update=value; }});
-  function find(label) {
+  function find(label, root = tree) {
     function visit(node) {
       if (!node || typeof node !== 'object') return undefined;
       if (node.props && node.props.label === label) return node;
       for(const child of node.children || []) { const found=visit(child); if(found) return found; }
     }
-    return visit(tree);
+    return visit(root);
   }
-  return {find, update: () => JSON.parse(JSON.stringify(update))};
+  return {find, inlineFind: label => find(label, tree.children[1]), sidebarFind: label => find(label, tree.children[0]), update: () => JSON.parse(JSON.stringify(update))};
 }
 const empty=editor({source:'auto',mode:'availability'});
 assert.equal(empty.find('Calendar source').props.value,'shootcal');
-assert.ok(empty.find('ShootCal calendar ID'));
+assert.ok(empty.inlineFind('Calendar source'));
+assert.ok(empty.inlineFind('ShootCal calendar ID'));
+assert.equal(empty.sidebarFind('Calendar source'),undefined);
+assert.equal(empty.sidebarFind('ShootCal calendar ID'),undefined);
+assert.ok(empty.sidebarFind('ShootCal display'));
 assert.equal(empty.find('Timezone override'),undefined);
 const generic=editor({url:'https://example.com/feed.ics',mode:'availability'});
 assert.equal(generic.find('Calendar source').props.value,'ical');
-assert.ok(generic.find('iCal feed URL'));
+assert.ok(generic.inlineFind('Calendar source'));
+assert.ok(generic.inlineFind('iCal feed URL'));
+assert.equal(generic.sidebarFind('iCal feed URL'),undefined);
 assert.ok(generic.find('Timezone override'));
 const token='FixtureCalendar_123';
 const legacy=editor({url:'https://api.shootcal.com/embed/'+token+'?view=calendar&theme=dark&months=12&first_day=1&sc_card=abcdef'});
@@ -46,4 +52,35 @@ const switched=editor({source:'ical',url:'https://example.com/feed.ics',calendar
 assert.equal(switched.find('Calendar source').props.value,'ical');
 assert.equal(switched.find('Display mode').props.value,'availability');
 assert.equal(switched.find('ShootCal display'),undefined);
-console.log('Block editor source and import tests passed.');
+// Switching sources keeps the other input available without presenting it in
+// the wrong field. Editing a ShootCal ID must not erase the saved iCal URL.
+let state={source:'ical',url:'https://example.com/private.ics',mode:'availability'};
+let current=editor(state);
+current.inlineFind('Calendar source').props.onChange('shootcal');
+state={...state,...current.update()};
+current=editor(state);
+assert.equal(current.inlineFind('ShootCal calendar ID').props.value,'');
+current.inlineFind('ShootCal calendar ID').props.onChange(token);
+state={...state,...current.update()};
+assert.equal(state.url,'https://example.com/private.ics');
+current=editor(state);
+current.inlineFind('Calendar source').props.onChange('ical');
+state={...state,...current.update()};
+current=editor(state);
+assert.equal(current.inlineFind('iCal feed URL').props.value,'https://example.com/private.ics');
+current.inlineFind('Calendar source').props.onChange('shootcal');
+state={...state,...current.update()};
+assert.equal(editor(state).inlineFind('ShootCal calendar ID').props.value,token);
+// Legacy hosted URLs migrate before the iCal URL field is reused.
+current=editor({url:'https://api.shootcal.com/embed/'+token+'?view=calendar&months=6'});
+current.inlineFind('Calendar source').props.onChange('ical');
+assert.deepEqual(current.update(),{source:'ical',calendarId:token,url:'',embedParams:{months:'6',view:'calendar'}});
+assert.equal(editor(current.update()).inlineFind('iCal feed URL').props.value,'');
+// An explicitly selected iCal feed on ShootCal's host remains a feed until the
+// user switches, and is retained if they switch back.
+state={source:'ical',url:'https://feed.shootcal.com/'+token+'.ics'};
+current=editor(state);
+current.inlineFind('Calendar source').props.onChange('shootcal');
+assert.equal(current.update().url,state.url);
+assert.equal(current.update().calendarId,token);
+console.log('Block editor source, inline controls, and import tests passed.');

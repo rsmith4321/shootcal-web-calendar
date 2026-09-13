@@ -7,22 +7,35 @@
 	wp.blocks.registerBlockType( 'shootcal-web-calendar/calendar', {
 		edit: function ( props ) {
 			var a = props.attributes, set = props.setAttributes;
-			var reference = Reference.parse( a.calendarId || a.url || '' );
+			var urlReference = Reference.parse( a.url || '' );
+			var reference = a.calendarId ? Reference.parse( a.calendarId ) : urlReference;
 			var source = a.source === 'ical' ? 'ical' : a.source === 'shootcal' || a.calendarId || reference || ! a.url ? 'shootcal' : 'ical';
 			var hosted = source === 'shootcal';
 			var query = reference ? reference.query : {};
 			query = hosted ? Object.assign( {}, query, Reference.cleanQuery( a.embedParams || {} ) ) : {};
 			var view = a.embedView || query.view || 'default';
 			var mode = a.mode === 'full' ? 'full' : 'availability';
-			var value = hosted ? a.calendarId || a.url || '' : a.url || '';
+			// Keep each source's input when switching between ShootCal and iCal.
+			// A legacy hosted URL is migrated once before the URL field is reused.
+			var feedUrl = a.url && ( ! urlReference || a.source === 'ical' || a.calendarId ) ? a.url : '';
+			var value = hosted ? a.calendarId || ( urlReference ? a.url : '' ) || '' : feedUrl;
+			function setSource( next ) {
+				var change = { source: next };
+				if ( ! a.calendarId && reference ) {
+					change.calendarId = reference.token;
+					change.url = feedUrl;
+					change.embedParams = Object.assign( {}, reference.query, a.embedParams );
+				}
+				set( change );
+			}
 			function updateOptions( change ) {
-				if ( hosted && reference && ! a.calendarId ) change = Object.assign( { calendarId: reference.token, url: '', embedParams: query }, change );
+				if ( hosted && reference && ! a.calendarId ) change = Object.assign( { calendarId: reference.token, url: feedUrl, embedParams: query }, change );
 				set( change );
 			}
 			function setReference( input ) {
 				var parsed = Reference.parse( input );
-				if ( ! parsed ) { set( { source: 'shootcal', calendarId: input, url: '' } ); return; }
-				var change = { source: 'shootcal', calendarId: parsed.token, url: '' };
+				if ( ! parsed ) { set( { source: 'shootcal', calendarId: input, url: feedUrl } ); return; }
+				var change = { source: 'shootcal', calendarId: parsed.token, url: feedUrl };
 				if ( input.trim() !== parsed.token ) {
 					change.embedParams = parsed.query;
 					change.embedView = parsed.query.view;
@@ -36,12 +49,13 @@
 			var sourceControl = el( SelectControl, {
 				label: __( 'Calendar source', 'shootcal-web-calendar' ), value: source,
 				options: [ { label: __( 'ShootCal', 'shootcal-web-calendar' ), value: 'shootcal' }, { label: __( 'Other calendar (iCal)', 'shootcal-web-calendar' ), value: 'ical' } ],
-				onChange: function ( next ) { set( { source: next } ); }
+				onChange: setSource
 			} );
 			var referenceControl = el( TextControl, {
 				label: hosted ? __( 'ShootCal calendar ID', 'shootcal-web-calendar' ) : __( 'iCal feed URL', 'shootcal-web-calendar' ),
-				help: hosted ? __( 'ShootCal: Clients & Booking > Connect to website. Existing ShootCal URLs, iframe snippets, and script snippets also work.', 'shootcal-web-calendar' ) : __( 'Paste an HTTP or HTTPS iCal feed URL from Google, Apple, Outlook, or another provider. Treat private feed URLs like passwords.', 'shootcal-web-calendar' ),
+				help: hosted ? __( 'Copy your WordPress calendar ID from ShootCal: Clients & Booking > Connect to website.', 'shootcal-web-calendar' ) : __( 'Paste an HTTP or HTTPS iCal feed URL from Google, Apple, Outlook, or another provider. Treat private feed URLs like passwords.', 'shootcal-web-calendar' ),
 				type: hosted ? 'text' : 'url', value: value, autoComplete: 'off', spellCheck: false,
+				placeholder: hosted ? __( 'Paste your ShootCal calendar ID', 'shootcal-web-calendar' ) : 'https://example.com/calendar.ics',
 				onChange: hosted ? setReference : function ( input ) { set( { source: 'ical', url: input.trim() } ); }
 			} );
 			var monthsValue = a.months !== undefined ? String( a.months ) : query.months || '';
@@ -55,7 +69,7 @@
 				! hosted ? el( TextControl, { label: __( 'Timezone override', 'shootcal-web-calendar' ), help: __( 'Leave blank for your WordPress site timezone, or enter an IANA identifier such as America/New_York.', 'shootcal-web-calendar' ), value: a.timezone || '', onChange: function ( input ) { set( { timezone: input.trim() } ); } } ) : null
 			) : null;
 			var sidebar = el( wp.blockEditor.InspectorControls, null,
-				el( PanelBody, { title: __( 'Calendar source', 'shootcal-web-calendar' ), initialOpen: true }, sourceControl, referenceControl,
+				el( PanelBody, { title: __( 'Display settings', 'shootcal-web-calendar' ), initialOpen: true },
 					hosted ? el( SelectControl, { label: __( 'ShootCal display', 'shootcal-web-calendar' ), value: view,
 						help: __( 'Follow ShootCal settings shows booking when enabled. Calendar only always shows the month calendar.', 'shootcal-web-calendar' ),
 						options: [ { label: __( 'Follow ShootCal settings', 'shootcal-web-calendar' ), value: 'default' }, { label: __( 'Calendar only', 'shootcal-web-calendar' ), value: 'calendar' } ],
@@ -69,8 +83,8 @@
 			);
 			var preview = el( 'div', wp.blockEditor.useBlockProps(), el( wp.components.Placeholder, {
 				icon: 'calendar-alt', label: __( 'ShootCal Web Calendar', 'shootcal-web-calendar' ),
-				instructions: hosted ? __( 'Your live ShootCal calendar adjusts its height automatically. Preview the page to see it.', 'shootcal-web-calendar' ) : __( 'WordPress displays your iCal calendar here. Preview the page to see it.', 'shootcal-web-calendar' )
-			}, referenceControl, hosted && value && ! reference ? el( 'p', { role: 'alert' }, __( 'Enter a valid ShootCal calendar ID or a ShootCal embed reference.', 'shootcal-web-calendar' ) ) : null ) );
+				instructions: __( 'Choose your calendar source and paste its ID or feed URL below. Preview the page to see your calendar.', 'shootcal-web-calendar' )
+			}, el( 'div', { className: 'shootcal-web-calendar__editor-fields', style: { width: '100%', minWidth: 0 } }, sourceControl, referenceControl, hosted && value && ! reference ? el( 'p', { role: 'alert' }, __( 'Enter a valid ShootCal calendar ID or a ShootCal embed reference.', 'shootcal-web-calendar' ) ) : null ) ) );
 			return el( wp.element.Fragment, null, sidebar, preview );
 		},
 		save: function () { return null; }
