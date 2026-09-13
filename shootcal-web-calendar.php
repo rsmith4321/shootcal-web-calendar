@@ -3,7 +3,7 @@
  * Plugin Name:       ShootCal Web Calendar
  * Plugin URI:        https://shootcal.com
  * Description:       Connect a live ShootCal calendar with its ID, or display another iCal feed as availability or a full calendar. Automatic embed resizing, shortcode, and block support.
- * Version:           2.5.3
+ * Version:           2.5.4
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Ryan Smith
@@ -21,7 +21,7 @@ namespace ShootCalWebCalendar;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '2.5.3';
+const VERSION     = '2.5.4';
 const SLUG        = 'shootcal-web-calendar';
 const OPTION_KEY  = 'shootcal_web_calendar_options';
 const CACHE_KEY   = 'shootcal_web_calendar_ical';

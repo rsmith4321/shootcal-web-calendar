@@ -57,7 +57,7 @@ class Admin_Menu {
 		);
 		if ( isset( $installed['natural-photo-slider/natural-photo-slider.php'] ) ) {
 			$plugins['natural-photo-slider'] = array(
-				'name' => __( 'Natural Photo Slider', 'shootcal-web-calendar' ),
+				'name' => __( 'Photo Slider', 'shootcal-web-calendar' ),
 				'description' => __( 'Create lightweight photo sliders from your WordPress Media Library.', 'shootcal-web-calendar' ),
 			);
 		}
