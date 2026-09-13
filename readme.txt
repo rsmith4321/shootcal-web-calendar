@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.5.2
+Stable tag: 2.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,9 @@ Imported ShootCal URLs retain validated presentation parameters for compatibilit
 
 == Upgrade Notice ==
 
+= 2.5.3 =
+Moves ShootCal Apps below Settings in the WordPress sidebar.
+
 = 2.5.2 =
 Expands performance-plugin compatibility and simplifies setup help. Clear generated CSS and page/CDN caches once after updating.
 
@@ -125,6 +128,10 @@ Adds automatic performance-plugin exclusions and a 12-month ShootCal default. Cl
 Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches after upgrading. If you used a private iCal URL with Page caching, replace that URL with your provider.
 
 == Changelog ==
+
+= 2.5.3 =
+* Move ShootCal Apps below Settings in the WordPress sidebar.
+* Show Natural Photo Slider in the apps overview when it is installed.
 
 = 2.5.2 =
 * Add verified exclusions for WP-Optimize, SiteGround Speed Optimizer, Hummingbird, and W3 Total Cache automatic minification.
