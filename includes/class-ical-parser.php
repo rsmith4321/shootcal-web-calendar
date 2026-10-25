@@ -330,7 +330,7 @@ class ICal_Parser {
 	 * @return Event[]|null
 	 */
 	private function expand_recurrence( Event $base, string $rrule, array $props, ?\DateTimeImmutable $window_start, ?\DateTimeImmutable $window_end ): ?array {
-		$rule = $this->parse_rrule( $rrule );
+		$rule = $this->parse_rrule( $rrule, $base->start->getTimezone() );
 		if ( null === $rule ) {
 			return null;
 		}
@@ -383,9 +383,9 @@ class ICal_Parser {
 	 * Parse the supported subset of an RRULE value into a normalized array, or
 	 * null if it uses an unsupported feature.
 	 *
-	 * @return array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[]}|null
+	 * @return array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[],wkst:int}|null
 	 */
-	private function parse_rrule( string $rrule ): ?array {
+	private function parse_rrule( string $rrule, ?\DateTimeZone $local_tz = null ): ?array {
 		$parts = array();
 		foreach ( explode( ';', $rrule ) as $seg ) {
 			$eq = strpos( $seg, '=' );
@@ -423,12 +423,19 @@ class ICal_Parser {
 			}
 		}
 
+		$weekdays = array( 'MO' => 1, 'TU' => 2, 'WE' => 3, 'TH' => 4, 'FR' => 5, 'SA' => 6, 'SU' => 7 );
+		$wkst = strtoupper( $parts['WKST'] ?? 'MO' );
+		if ( ! isset( $weekdays[ $wkst ] ) ) {
+			return null;
+		}
+
 		return array(
 			'freq'     => $freq,
 			'interval' => isset( $parts['INTERVAL'] ) ? max( 1, (int) $parts['INTERVAL'] ) : 1,
 			'count'    => isset( $parts['COUNT'] ) ? max( 0, (int) $parts['COUNT'] ) : null,
-			'until'    => isset( $parts['UNTIL'] ) ? $this->parse_until( (string) $parts['UNTIL'] ) : null,
+			'until'    => isset( $parts['UNTIL'] ) ? $this->parse_until( (string) $parts['UNTIL'], $local_tz ) : null,
 			'byday'    => $byday,
+			'wkst'     => $weekdays[ $wkst ],
 		);
 	}
 
@@ -436,7 +443,7 @@ class ICal_Parser {
 	 * Parse an RRULE UNTIL value (date, UTC datetime, or local datetime). Always
 	 * resolved against UTC; comparisons elsewhere are by absolute instant.
 	 */
-	private function parse_until( string $value ): ?\DateTimeImmutable {
+	private function parse_until( string $value, ?\DateTimeZone $local_tz = null ): ?\DateTimeImmutable {
 		$value = trim( $value );
 		if ( preg_match( '/^\d{8}$/', $value ) ) {
 			// All-day UNTIL is inclusive of that whole day.
@@ -447,7 +454,7 @@ class ICal_Parser {
 			$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis\Z', $value, new \DateTimeZone( 'UTC' ) );
 			return false === $dt ? null : $dt;
 		}
-		$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis', $value, new \DateTimeZone( 'UTC' ) );
+		$dt = \DateTimeImmutable::createFromFormat( 'Ymd\THis', $value, $local_tz ?? $this->resolve_timezone( '' ) );
 		return false === $dt ? null : $dt;
 	}
 
@@ -457,7 +464,7 @@ class ICal_Parser {
 	 * filtering happens in the caller; per RFC 5545 excluded occurrences still
 	 * count toward COUNT, so they ARE generated here.
 	 *
-	 * @param array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[]} $rule
+	 * @param array{freq:string,interval:int,count:?int,until:?\DateTimeImmutable,byday:string[],wkst:int} $rule
 	 * @return \DateTimeImmutable[]
 	 */
 	private function generate_starts( \DateTimeImmutable $dtstart, array $rule, \DateTimeImmutable $floor, \DateTimeImmutable $horizon ): array {
@@ -468,7 +475,7 @@ class ICal_Parser {
 		$byday    = $rule['byday'];
 
 		$starts = array();
-		if ( 0 === $count || $horizon <= $dtstart || ( null !== $until && $until < $floor ) ) {
+		if ( 0 === $count || $horizon < $dtstart || ( null !== $until && $until < $floor ) ) {
 			return $starts;
 		}
 
@@ -476,52 +483,70 @@ class ICal_Parser {
 			if ( null !== $until && $occ > $until ) {
 				return false;
 			}
-			return $occ < $horizon;
+			return $occ <= $horizon;
 		};
 		$local_floor   = $floor->setTimezone( $dtstart->getTimezone() );
 		$local_horizon = $horizon->setTimezone( $dtstart->getTimezone() );
 
 		if ( 'WEEKLY' === $freq && array() !== $byday ) {
 			$map     = array( 'MO' => 1, 'TU' => 2, 'WE' => 3, 'TH' => 4, 'FR' => 5, 'SA' => 6, 'SU' => 7 );
+			$wkst = $rule['wkst'];
+			$anchor_offset = ( (int) $dtstart->format( 'N' ) - $wkst + 7 ) % 7;
 			$targets = array();
 			foreach ( $byday as $d ) {
-				$targets[] = $map[ $d ];
+				$targets[] = ( $map[ $d ] - $wkst + 7 ) % 7;
 			}
 			$targets = array_values( array_unique( $targets ) );
 			sort( $targets );
 
-			$h = (int) $dtstart->format( 'H' );
-			$i = (int) $dtstart->format( 'i' );
-			$s = (int) $dtstart->format( 's' );
+			$wall_clock = $dtstart->format( 'H:i:s' );
 
-			$anchor = $dtstart->modify( 'monday this week' )->setTime( $h, $i, $s );
-			$days_to_floor = max( 0, $this->calendar_days_between( $anchor, $local_floor ) );
-			$days_to_end   = max( 0, $this->calendar_days_between( $anchor, $local_horizon ) );
+			// Week boundaries are civil dates, even if DTSTART's zone skipped
+			// the whole WKST date (Apia 2011-12-30). Do date arithmetic in UTC,
+			// then resolve only each target's wall clock in the DTSTART zone.
+			$calendar_zone = new \DateTimeZone( 'UTC' );
+			$anchor = ( new \DateTimeImmutable( $dtstart->format( 'Y-m-d' ) . ' 12:00:00', $calendar_zone ) )->modify( '-' . $anchor_offset . ' days' );
+			$floor_date = new \DateTimeImmutable( $local_floor->format( 'Y-m-d' ), $calendar_zone );
+			$end_date = new \DateTimeImmutable( $local_horizon->format( 'Y-m-d' ), $calendar_zone );
+			$days_to_floor = max( 0, $this->calendar_days_between( $anchor, $floor_date ) );
+			$days_to_end   = max( 0, $this->calendar_days_between( $anchor, $end_date ) );
 			$week = max( 0, intdiv( intdiv( $days_to_floor, 7 ), $interval ) - 1 );
 			$last_week = intdiv( intdiv( $days_to_end, 7 ), $interval );
 			// Count skipped candidates arithmetically, including the partial first
 			// week. COUNT is a limit on the series, not on visible/excluded results.
-			$first_week_count = count( array_filter( $targets, static fn( int $day ): bool => $day >= (int) $dtstart->format( 'N' ) ) );
+			$first_week_count = count( array_filter( $targets, static fn( int $day ): bool => $day >= $anchor_offset ) );
 			$emitted = $week > 0 ? $first_week_count + ( $week - 1 ) * count( $targets ) : 0;
+			$seen = array();
+			if ( $week > 0 && null !== $count ) {
+				// Arithmetic counts civil targets. Rare whole-day zone jumps can
+				// normalize two targets to one instant, including before the floor.
+				[ $duplicates, $seen ] = $this->weekly_history_duplicates( $dtstart, $anchor, $targets, $interval, $week );
+				$emitted -= $duplicates;
+			}
 			$safety = 0;
 			while ( $week <= $last_week && $safety++ < self::MAX_ITERATIONS ) {
 				if ( null !== $count && $emitted >= $count ) {
 					break;
 				}
-				// Monday of the dtstart week, advanced by whole INTERVAL weeks.
-				$week_start = $anchor
-					->modify( '+' . ( $week * $interval ) . ' weeks' )
-					->setTime( $h, $i, $s );
+				// WKST of the DTSTART week, advanced by whole INTERVAL weeks.
+				$week_start = $anchor->modify( '+' . ( $week * $interval ) . ' weeks' );
 				++$week;
 
 				foreach ( $targets as $n ) {
-					$occ = $week_start->modify( '+' . ( $n - 1 ) . ' days' );
+					$target_date = $week_start->modify( '+' . $n . ' days' )->format( 'Y-m-d' );
+					$target = $target_date . ' ' . $wall_clock;
+					$occ = $this->weekly_wall_start( $target, $dtstart->getTimezone() );
 					if ( $occ < $dtstart ) {
 						continue; // weekdays before the series start (first week only)
 					}
 					if ( ! $within( $occ ) ) {
 						continue;
 					}
+					$key = $occ->getTimestamp();
+					if ( isset( $seen[ $key ] ) ) {
+						continue; // duplicate resolved instants do not consume COUNT
+					}
+					$seen[ $key ] = true;
 					++$emitted;
 					if ( $occ >= $floor ) {
 						$starts[] = $occ;
@@ -572,6 +597,73 @@ class ICal_Parser {
 		}
 		return $starts;
 	}
+
+	private function weekly_wall_start( string $target, \DateTimeZone $zone ): \DateTimeImmutable {
+		$occ = new \DateTimeImmutable( $target, $zone );
+		$timestamp = $occ->getTimestamp();
+		$offset = $occ->getOffset();
+		foreach ( $zone->getTransitions( $timestamp - 172800, $timestamp ) ?: array() as $transition ) {
+			$delta = $transition['offset'] - $offset;
+			if ( $delta > 0 ) {
+				$earlier = $occ->setTimestamp( $timestamp - $delta );
+				if ( $earlier < $occ && $earlier->format( 'Y-m-d H:i:s' ) === $target ) {
+					$occ = $earlier;
+				}
+			}
+		}
+		return $occ;
+	}
+
+
+	private function weekly_history_duplicates( \DateTimeImmutable $dtstart, \DateTimeImmutable $anchor, array $targets, int $interval, int $week ): array {
+		$zone = $dtstart->getTimezone();
+		$clock = $dtstart->format( 'H:i:s' );
+		$prefix_end = $week * $interval;
+		$end = $anchor->modify( '+' . $prefix_end . ' weeks' )->getTimestamp() + 172800;
+		$transitions = $zone->getTransitions( $dtstart->getTimestamp() - 172800, $end ) ?: array();
+		$candidates = array();
+		$member = function ( \DateTimeImmutable $date ) use ( $dtstart, $anchor, $targets, $interval ): ?int {
+			if ( $date->format( 'Y-m-d' ) < $dtstart->format( 'Y-m-d' ) ) {
+				return null;
+			}
+			$days = $this->calendar_days_between( $anchor, $date );
+			$w = intdiv( $days, 7 );
+			return $days >= 0 && $w % $interval === 0 && in_array( $days % 7, $targets, true ) ? $w : null;
+		};
+		for ( $i = 1; $i < count( $transitions ); ++$i ) {
+			$jump = $transitions[ $i ]['offset'] - $transitions[ $i - 1 ]['offset'];
+			if ( $jump < 86400 || $jump % 86400 !== 0 ) {
+				continue;
+			}
+			$gap_start = $transitions[ $i ]['ts'] + $transitions[ $i - 1 ]['offset'];
+			$gap_end = $transitions[ $i ]['ts'] + $transitions[ $i ]['offset'];
+			$date = ( new \DateTimeImmutable( '@' . $gap_start ) )->setTime( 0, 0 );
+			for ( ; $date->getTimestamp() < $gap_end; $date = $date->modify( '+1 day' ) ) {
+				$wall = new \DateTimeImmutable( $date->format( 'Y-m-d' ) . ' ' . $clock, new \DateTimeZone( 'UTC' ) );
+				if ( $wall->getTimestamp() < $gap_start || $wall->getTimestamp() >= $gap_end || null === $member( $date ) ) {
+					continue;
+				}
+				$occ = $this->weekly_wall_start( $wall->format( 'Y-m-d H:i:s' ), $zone );
+				$other = new \DateTimeImmutable( $occ->format( 'Y-m-d' ), new \DateTimeZone( 'UTC' ) );
+				if ( null === $member( $other ) || $this->weekly_wall_start( $other->format( 'Y-m-d' ) . ' ' . $clock, $zone )->getTimestamp() !== $occ->getTimestamp() ) {
+					continue;
+				}
+				foreach ( array( $date, $other ) as $candidate ) {
+					if ( $member( $candidate ) < $prefix_end ) {
+						$candidates[ $occ->getTimestamp() ][ $candidate->format( 'Y-m-d' ) ] = true;
+					}
+				}
+			}
+		}
+		$duplicates = 0;
+		$seen = array();
+		foreach ( $candidates as $key => $dates ) {
+			$duplicates += count( $dates ) - 1;
+			$seen[ $key ] = true;
+		}
+		return array( $duplicates, $seen );
+	}
+
 
 	/** Civil days, rather than 86400-second periods, preserve local time over DST. */
 	private function calendar_days_between( \DateTimeImmutable $start, \DateTimeImmutable $end ): int {

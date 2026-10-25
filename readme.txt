@@ -4,7 +4,7 @@ Tags: calendar, google calendar, availability, booking, ical
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.5.4
+Stable tag: 2.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,10 @@ Adds automatic performance-plugin exclusions and a 12-month ShootCal default. Cl
 Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches after upgrading. If you used a private iCal URL with Page caching, replace that URL with your provider.
 
 == Changelog ==
+
+= 2.5.5 =
+* Recurring iCal events now follow local ending times and the feed’s week start.
+* Avoid duplicate occurrences and missing later dates around time-zone changes.
 
 = 2.5.4 =
 * Name the slider app Photo Slider to match the ShootCal Slider admin screen.
