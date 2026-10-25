@@ -48,7 +48,7 @@ $copy_hooks = static function ( array $hooks ): array {
 $saved_globals = array();
 foreach ( array( 'menu', 'submenu', 'admin_page_hooks', '_registered_pages', '_parent_pages', '_wp_real_parent_file',
 	'_wp_menu_nopriv', '_wp_submenu_nopriv', 'pagenow', 'plugin_page', 'parent_file', 'typenow',
-	'current_user', 'wp_object_cache', 'wp_scripts', 'wp_styles' ) as $name ) {
+	'current_user', 'current_screen', 'wp_object_cache', 'wp_scripts', 'wp_styles' ) as $name ) {
 	$saved_globals[ $name ] = array( array_key_exists( $name, $GLOBALS ), $GLOBALS[ $name ] ?? null );
 }
 $baseline_hooks = $copy_hooks( $GLOBALS['wp_filter'] );
@@ -57,17 +57,57 @@ $option_names = array( 'active_plugins', 'cron', 'shootcal_web_calendar_options'
 	'shootcal_instagram_feed_status', 'shootcal_instagram_feed_refresh_lock', 'shootcal_instagram_feed_oauth' );
 $stored_before = array_map( 'get_option', $option_names );
 $slugs = array( 'calendar' => 'shootcal-web-calendar', 'social' => 'shootcal-instagram-feed' );
-$files = array_map( static fn( string $slug ): string => $slug . '/' . $slug . '.php', $slugs );
+// Resolve the actual loaded package, including the public directory folder.
+$files = array( 'calendar' => 'shootcal-web-calendar/shootcal-web-calendar.php', 'social' => plugin_basename( \ShootCalInstagramFeed\PLUGIN_FILE ) );
 
 try {
-	$normalizer = static function ( string $source ): string {
-		$source = preg_replace( '#/\*\*.*?\*/#s', '', $source );
-		return str_replace( array( 'ShootCalInstagramFeed', ", 'shootcal-instagram-feed' )" ), array( 'ShootCalWebCalendar', ", 'shootcal-web-calendar' )" ), $source );
-	};
-	$assert( $normalizer( file_get_contents( dirname( __DIR__ ) . '/includes/class-admin-menu.php' ) )
-		=== $normalizer( file_get_contents( $social_root . '/includes/class-admin-menu.php' ) ), 'Shared menu helpers differ beyond namespace, text domain, and documentation.' );
+	set_current_screen( 'dashboard' );
+	// Source identity is not the contract: Social intentionally registers at 8,
+	// before Calendar's 9, and its directory slug differs from its settings page.
 	foreach ( array( 'assets/css/admin-menu.css', 'assets/img/shootcal-logo.svg' ) as $asset ) {
 		$assert( file_get_contents( dirname( __DIR__ ) . '/' . $asset ) === file_get_contents( $social_root . '/' . $asset ), 'Shared menu assets must match in both plugins.' );
+	}
+
+	// Calendar's own overview also runs with Social inactive or missing, when
+	// Social's earlier callback cannot correct Calendar's directory metadata.
+	$public = 'shootcal-social-feed/shootcal-instagram-feed.php';
+	$private = 'shootcal-instagram-feed/shootcal-instagram-feed.php';
+	$states = array(
+		array( array( $public ), array(), $public ),
+		array( array( $private ), array(), $private ),
+		array( array( $public ), array( $public ), $public ),
+		array( array( $private ), array( $private ), $private ),
+		array( array( $public, $private ), array( $private ), $private ),
+		array( array( $public, $private ), array( $public ), $public ),
+		array( array( $public, $private ), array( $public, $private ), $public ),
+		array( array(), array(), null ),
+	);
+	foreach ( $states as [ $present_files, $active_files, $selected ] ) {
+		$GLOBALS['wp_filter'] = $copy_hooks( $baseline_hooks );
+		$GLOBALS['wp_object_cache'] = new WP_Object_Cache();
+		$user = new WP_User();
+		$user->ID = 987654321;
+		$user->allcaps = array( 'read' => true, 'manage_options' => true );
+		$GLOBALS['current_user'] = $user;
+		add_filter( 'pre_option_active_plugins', static fn() => $active_files );
+		add_filter( 'pre_site_option_active_sitewide_plugins', static fn() => array() );
+		$installed = array( $files['calendar'] => array( 'Version' => 'calendar-fixture' ) );
+		foreach ( $present_files as $file ) { $installed[ $file ] = array( 'Version' => $file === $public ? 'public-fixture' : 'private-fixture' ); }
+		wp_cache_set( 'plugins', array( '' => $installed ), 'plugins' );
+		ob_start();
+		( new \ShootCalWebCalendar\Admin_Menu() )->render_page();
+		$html = ob_get_clean();
+		preg_match_all( '#<section class="card".*?</section>#s', $html, $cards );
+		$social_cards = array_values( array_filter( $cards[0], static fn( $card ) => str_contains( $card, '>Social Feed</h2>' ) ) );
+		$assert( 1 === count( $social_cards ), 'Calendar overview has one Social card for each installation state.' );
+		$card = $social_cards[0];
+		$active = $selected !== null && in_array( $selected, $active_files, true );
+		$status = $active ? 'Active' : ( $selected === null ? 'Not installed' : 'Installed, inactive' );
+		$assert( str_contains( $card, '<p>' . $status ), 'Calendar reports actual public/private Social installation status: ' . $status );
+		$url = $active ? admin_url( 'admin.php?page=shootcal-instagram-feed' ) : ( $selected !== null ? admin_url( 'plugins.php' ) : 'https://wordpress.org/plugins/shootcal-social-feed/' );
+		$assert( str_contains( $card, 'href="' . esc_url( $url ) . '"' ), 'Social card chooses settings, plugin management, or the public directory URL.' );
+		$assert( ! str_contains( $card, 'https://wordpress.org/plugins/shootcal-instagram-feed/' ), 'Calendar never advertises the private folder as a directory listing.' );
+		if ( $selected !== null ) { $assert( str_contains( $card, $selected === $public ? 'public-fixture' : 'private-fixture' ), 'Calendar displays the selected installation version, preferring an active legacy copy.' ); }
 	}
 
 	foreach ( array( array( 'calendar' ), array( 'social' ), array( 'calendar', 'social' ), array( 'social', 'calendar' ) ) as $order ) {
@@ -100,14 +140,29 @@ try {
 					\ShootCalInstagramFeed\bootstrap();
 				}
 			}
+			$priorities = array();
+			foreach ( $GLOBALS['wp_filter']['admin_menu']->callbacks as $priority => $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					$fn = $callback['function'];
+					if ( is_array( $fn ) && $fn[0] instanceof \ShootCalWebCalendar\Admin_Menu ) { $priorities['calendar'] = $priority; }
+					if ( is_array( $fn ) && $fn[0] instanceof \ShootCalInstagramFeed\Admin_Menu ) { $priorities['social'] = $priority; }
+				}
+			}
+			$assert( ! in_array( 'calendar', $order, true ) || 9 === $priorities['calendar'], 'Calendar retains priority 9.' );
+			$assert( ! in_array( 'social', $order, true ) || 8 === $priorities['social'], 'Current Social retains priority 8.' );
 			do_action( 'admin_menu' );
 			$parents = array_filter( $GLOBALS['menu'], static fn( array $entry ): bool => 'shootcal' === $entry[2] );
 			$assert( 1 === count( $parents ), 'Each load order must register exactly one ShootCal parent.' );
 			$parent = reset( $parents );
 			$assert( 'ShootCal Apps' === $parent[0] && 'ShootCal Apps' === $parent[3], 'Parent label and page title must be ShootCal Apps.' );
-			$owner_url = 'calendar' === $order[0] ? \ShootCalWebCalendar\PLUGIN_URL : \ShootCalInstagramFeed\PLUGIN_URL;
-			$assert( $owner_url . 'assets/img/shootcal-logo.svg' === $parent[6], 'Parent logo must use the first active plugin local SVG.' );
+			$owner = in_array( 'social', $order, true ) ? 'social' : 'calendar';
+			$owner_url = 'calendar' === $owner ? \ShootCalWebCalendar\PLUGIN_URL : \ShootCalInstagramFeed\PLUGIN_URL;
+			$assert( $owner_url . 'assets/img/shootcal-logo.svg' === $parent[6], 'Parent logo must use the priority-selected owner local SVG in either load order.' );
 			$assert( 'shootcal-apps' === $GLOBALS['admin_page_hooks']['shootcal'], 'WordPress must derive its page hook prefix from ShootCal Apps.' );
+			$overview_hook = get_plugin_page_hook( 'shootcal', 'admin.php' );
+			$overview_callbacks = $GLOBALS['wp_filter'][ $overview_hook ]->callbacks[10] ?? array();
+			$expected_owner = 'social' === $owner ? \ShootCalInstagramFeed\Admin_Menu::class : \ShootCalWebCalendar\Admin_Menu::class;
+			$assert( $administrator ? ( 1 === count( $overview_callbacks ) && reset( $overview_callbacks )['function'][0] instanceof $expected_owner ) : 0 === count( $overview_callbacks ), 'Only administrators receive one overview callback from the priority-selected owner.' );
 			$children = array_column( $GLOBALS['submenu']['shootcal'] ?? array(), 2 );
 			foreach ( $GLOBALS['submenu']['shootcal'] ?? array() as $child ) {
 				$icons = array( 'shootcal' => 'dashicons-admin-home', $slugs['calendar'] => 'dashicons-calendar-alt', $slugs['social'] => 'dashicons-instagram' );
@@ -165,7 +220,7 @@ try {
 					$dashboard->render_page();
 					$missing_html = ob_get_clean();
 					$other = 'calendar' === $key ? 'social' : 'calendar';
-					$assert( str_contains( $missing_html, 'Not installed' ) && str_contains( $missing_html, 'https://wordpress.org/plugins/' . $slugs[ $other ] . '/' ), 'Missing plugin must link to its directory page.' );
+					$assert( str_contains( $missing_html, 'Not installed' ) && str_contains( $missing_html, 'https://wordpress.org/plugins/' . ( 'social' === $other ? 'shootcal-social-feed' : $slugs[ $other ] ) . '/' ), 'Missing plugin must link to its directory page.' );
 				}
 			}
 		}

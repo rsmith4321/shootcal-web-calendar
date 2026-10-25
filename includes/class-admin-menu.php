@@ -45,12 +45,24 @@ class Admin_Menu {
 			return;
 		}
 		$installed = get_plugins();
+		// The directory package keeps the original settings page and entry filename.
+		// Prefer an active installation, while still recognizing older private installs.
+		$social_files = array( 'shootcal-social-feed/shootcal-instagram-feed.php', 'shootcal-instagram-feed/shootcal-instagram-feed.php' );
+		$social_file = isset( $installed[ $social_files[0] ] ) || ! isset( $installed[ $social_files[1] ] ) ? $social_files[0] : $social_files[1];
+		foreach ( $social_files as $candidate ) {
+			if ( is_plugin_active( $candidate ) ) {
+				$social_file = $candidate;
+				break;
+			}
+		}
 		$plugins = array(
 			'shootcal-web-calendar' => array(
 				'name' => __( 'Calendar', 'shootcal-web-calendar' ),
 				'description' => __( 'Embed your ShootCal calendar or display another iCal feed.', 'shootcal-web-calendar' ),
 			),
-			'shootcal-instagram-feed' => array(
+			'shootcal-social-feed' => array(
+				'file' => $social_file,
+				'page' => 'shootcal-instagram-feed',
 				'name' => __( 'Social Feed', 'shootcal-web-calendar' ),
 				'description' => __( 'Display your Instagram photos with saved feeds and hashtag filters.', 'shootcal-web-calendar' ),
 			),
@@ -67,10 +79,11 @@ class Admin_Menu {
 			<p><?php esc_html_e( 'Manage your ShootCal WordPress plugins.', 'shootcal-web-calendar' ); ?></p>
 			<div style="display:flex;flex-wrap:wrap;gap:16px;max-width:900px;">
 			<?php foreach ( $plugins as $slug => $plugin ) :
-				$file = $slug . '/' . $slug . '.php';
+				$file = $plugin['file'] ?? $slug . '/' . $slug . '.php';
+				$page = $plugin['page'] ?? $slug;
 				$active = is_plugin_active( $file );
 				$present = isset( $installed[ $file ] );
-				$url = $active ? admin_url( 'admin.php?page=' . $slug ) : ( $present ? admin_url( 'plugins.php' ) : 'https://wordpress.org/plugins/' . $slug . '/' );
+				$url = $active ? admin_url( 'admin.php?page=' . $page ) : ( $present ? admin_url( 'plugins.php' ) : 'https://wordpress.org/plugins/' . $slug . '/' );
 				?>
 				<section class="card" style="flex:1 1 280px;margin:0;">
 					<h2><?php echo esc_html( $plugin['name'] ); ?></h2>

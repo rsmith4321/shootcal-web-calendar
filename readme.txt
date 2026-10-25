@@ -130,6 +130,7 @@ Adds ShootCal calendar IDs and fixes iCal feed privacy. Clear page/CDN caches af
 == Changelog ==
 
 = 2.5.5 =
+* ShootCal Apps recognizes Social Feed installed from WordPress.org as well as earlier private installations.
 * Recurring iCal events now follow local ending times and the feed’s week start.
 * Avoid duplicate occurrences and missing later dates around time-zone changes.
 
